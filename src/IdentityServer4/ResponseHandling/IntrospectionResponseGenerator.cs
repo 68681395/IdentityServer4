@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityModel;
 using IdentityServer4.Extensions;
 using IdentityServer4.Models;
@@ -29,7 +30,7 @@ namespace IdentityServer4.ResponseHandling
             
             if (validationResult.IsActive == false)
             {
-                _logger.LogInformation("Creating introspection response for inactive token.");
+                _logger.LogDebug("Creating introspection response for inactive token.");
 
                 response.Add("active", false);
                 return Task.FromResult(response);
@@ -37,18 +38,18 @@ namespace IdentityServer4.ResponseHandling
 
             if (scope.AllowUnrestrictedIntrospection)
             {
-                _logger.LogInformation("Creating unrestricted introspection response for active token.");
+                _logger.LogDebug("Creating unrestricted introspection response for active token.");
 
                 response = validationResult.Claims.ToClaimsDictionary();
                 response.Add("active", true);
             }
             else
             {
-                _logger.LogInformation("Creating restricted introspection response for active token.");
+                _logger.LogDebug("Creating restricted introspection response for active token.");
 
                 response = validationResult.Claims.Where(c => c.Type != JwtClaimTypes.Scope).ToClaimsDictionary();
                 response.Add("active", true);
-                response.Add("scope", scope.Name);
+                response.Add("scope", new[] { scope.Name });
             }
 
             return Task.FromResult(response);

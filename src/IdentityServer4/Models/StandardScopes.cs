@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityModel;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,20 +19,14 @@ namespace IdentityServer4.Models
         /// <value>
         /// All.
         /// </value>
-        public static IEnumerable<Scope> All
+        public static IEnumerable<Scope> All => new[]
         {
-            get
-            {
-                return new[]
-                {
-                    OpenId,
-                    Profile,
-                    Email,
-                    Phone,
-                    Address
-                };
-            }
-        }
+            OpenId,
+            Profile,
+            Email,
+            Phone,
+            Address
+        };
 
         /// <summary>
         /// All identity scopes (always include claims in token).
@@ -39,20 +34,14 @@ namespace IdentityServer4.Models
         /// <value>
         /// All always include.
         /// </value>
-        public static IEnumerable<Scope> AllAlwaysInclude
+        public static IEnumerable<Scope> AllAlwaysInclude => new[]
         {
-            get
-            {
-                return new[]
-                {
-                    OpenId,
-                    ProfileAlwaysInclude,
-                    EmailAlwaysInclude,
-                    PhoneAlwaysInclude,
-                    AddressAlwaysInclude
-                };
-            }
-        }
+            OpenId,
+            ProfileAlwaysInclude,
+            EmailAlwaysInclude,
+            PhoneAlwaysInclude,
+            AddressAlwaysInclude
+        };
 
 
         /// <summary>
@@ -61,22 +50,17 @@ namespace IdentityServer4.Models
         /// <value>
         /// The open identifier.
         /// </value>
-        public static Scope OpenId
+        public static Scope OpenId => new Scope
         {
-            get
+            Name = Constants.StandardScopes.OpenId,
+            DisplayName = "Your user identifier",
+            Required = true,
+            Type = ScopeType.Identity,
+            Claims = new List<ScopeClaim>
             {
-                return new Scope
-                {
-                    Name = Constants.StandardScopes.OpenId,
-                    Required = true,
-                    Type = ScopeType.Identity,
-                    Claims = new List<ScopeClaim>
-                    {
-                        new ScopeClaim(JwtClaimTypes.Subject, alwaysInclude: true)
-                    }
-                };
+                new ScopeClaim(JwtClaimTypes.Subject, alwaysInclude: true)
             }
-        }
+        };
 
         /// <summary>
         /// Gets the "profile" scope.
@@ -91,6 +75,8 @@ namespace IdentityServer4.Models
                 return new Scope
                 {
                     Name = Constants.StandardScopes.Profile,
+                    DisplayName = "User profile",
+                    Description = "Your user profile information (first name, last name, etc.)",
                     Type = ScopeType.Identity,
                     Emphasize = true,
                     Claims = (Constants.ScopeToClaimsMapping[Constants.StandardScopes.Profile].Select(claim => new ScopeClaim(claim)).ToList())
@@ -111,6 +97,8 @@ namespace IdentityServer4.Models
                 return new Scope
                 {
                     Name = Constants.StandardScopes.Profile,
+                    DisplayName = "User profile",
+                    Description = "Your user profile information (first name, last name, etc.)",
                     Type = ScopeType.Identity,
                     Emphasize = true,
                     Claims = (Constants.ScopeToClaimsMapping[Constants.StandardScopes.Profile].Select(claim => new ScopeClaim(claim, alwaysInclude: true)).ToList())
@@ -131,6 +119,7 @@ namespace IdentityServer4.Models
                 return new Scope
                 {
                     Name = Constants.StandardScopes.Email,
+                    DisplayName = "Your email address",
                     Type = ScopeType.Identity,
                     Emphasize = true,
                     Claims = (Constants.ScopeToClaimsMapping[Constants.StandardScopes.Email].Select(claim => new ScopeClaim(claim)).ToList())
@@ -151,6 +140,7 @@ namespace IdentityServer4.Models
                 return new Scope
                 {
                     Name = Constants.StandardScopes.Email,
+                    DisplayName = "Your email address",
                     Type = ScopeType.Identity,
                     Emphasize = true,
                     Claims = (Constants.ScopeToClaimsMapping[Constants.StandardScopes.Email].Select(claim => new ScopeClaim(claim, alwaysInclude: true)).ToList())
@@ -171,6 +161,7 @@ namespace IdentityServer4.Models
                 return new Scope
                 {
                     Name = Constants.StandardScopes.Phone,
+                    DisplayName = "Your phone number",
                     Type = ScopeType.Identity,
                     Emphasize = true,
                     Claims = (Constants.ScopeToClaimsMapping[Constants.StandardScopes.Phone].Select(claim => new ScopeClaim(claim)).ToList())
@@ -191,6 +182,7 @@ namespace IdentityServer4.Models
                 return new Scope
                 {
                     Name = Constants.StandardScopes.Phone,
+                    DisplayName = "Your phone number",
                     Type = ScopeType.Identity,
                     Emphasize = true,
                     Claims = (Constants.ScopeToClaimsMapping[Constants.StandardScopes.Phone].Select(claim => new ScopeClaim(claim, alwaysInclude: true)).ToList())
@@ -211,6 +203,7 @@ namespace IdentityServer4.Models
                 return new Scope
                 {
                     Name = Constants.StandardScopes.Address,
+                    DisplayName = "Your postal address",
                     Type = ScopeType.Identity,
                     Emphasize = true,
                     Claims = (Constants.ScopeToClaimsMapping[Constants.StandardScopes.Address].Select(claim => new ScopeClaim(claim)).ToList())
@@ -231,6 +224,7 @@ namespace IdentityServer4.Models
                 return new Scope
                 {
                     Name = Constants.StandardScopes.Address,
+                    DisplayName = "Your postal address",
                     Type = ScopeType.Identity,
                     Emphasize = true,
                     Claims = (Constants.ScopeToClaimsMapping[Constants.StandardScopes.Address].Select(claim => new ScopeClaim(claim, alwaysInclude: true)).ToList())
@@ -244,19 +238,14 @@ namespace IdentityServer4.Models
         /// <value>
         /// All claims.
         /// </value>
-        public static Scope AllClaims
+        public static Scope AllClaims => new Scope
         {
-            get
-            {
-                return new Scope
-                {
-                    Name = Constants.StandardScopes.AllClaims,
-                    Type = ScopeType.Identity,
-                    Emphasize = true,
-                    IncludeAllClaimsForUser = true
-                };
-            }
-        }
+            Name = Constants.StandardScopes.AllClaims,
+            DisplayName = "All user information",
+            Type = ScopeType.Identity,
+            Emphasize = true,
+            IncludeAllClaimsForUser = true
+        };
 
         /// <summary>
         /// Gets the "roles" scope.
@@ -264,22 +253,17 @@ namespace IdentityServer4.Models
         /// <value>
         /// The roles.
         /// </value>
-        public static Scope Roles
+        public static Scope Roles => new Scope
         {
-            get
+            Name = Constants.StandardScopes.Roles,
+            DisplayName = "User roles",
+            Type = ScopeType.Identity,
+            Emphasize = true,
+            Claims = new List<ScopeClaim> 
             {
-                return new Scope
-                {
-                    Name = Constants.StandardScopes.Roles,
-                    Type = ScopeType.Identity,
-                    Emphasize = true,
-                    Claims = new List<ScopeClaim> 
-                    {
-                        new ScopeClaim(JwtClaimTypes.Role)
-                    }
-                };
+                new ScopeClaim(JwtClaimTypes.Role)
             }
-        }
+        };
 
         /// <summary>
         /// Gets the "roles" scope (always include claims in token).
@@ -287,22 +271,17 @@ namespace IdentityServer4.Models
         /// <value>
         /// The roles always include.
         /// </value>
-        public static Scope RolesAlwaysInclude
+        public static Scope RolesAlwaysInclude => new Scope
         {
-            get
+            Name = Constants.StandardScopes.Roles,
+            DisplayName = "User roles",
+            Type = ScopeType.Identity,
+            Emphasize = true,
+            Claims = new List<ScopeClaim>
             {
-                return new Scope
-                {
-                    Name = Constants.StandardScopes.Roles,
-                    Type = ScopeType.Identity,
-                    Emphasize = true,
-                    Claims = new List<ScopeClaim>
-                    {
-                        new ScopeClaim(JwtClaimTypes.Role, alwaysInclude: true)
-                    }
-                };
+                new ScopeClaim(JwtClaimTypes.Role, alwaysInclude: true)
             }
-        }
+        };
 
         /// <summary>
         /// Gets the "offline_access" scope.
@@ -310,17 +289,12 @@ namespace IdentityServer4.Models
         /// <value>
         /// The offline access.
         /// </value>
-        public static Scope OfflineAccess
+        public static Scope OfflineAccess => new Scope
         {
-            get
-            {
-                return new Scope
-                {
-                    Name = Constants.StandardScopes.OfflineAccess,
-                    Type = ScopeType.Resource,
-                    Emphasize = true
-                };
-            }
-        }
+            Name = Constants.StandardScopes.OfflineAccess,
+            DisplayName = "Offline access",
+            Type = ScopeType.Resource,
+            Emphasize = true
+        };
     }
 }

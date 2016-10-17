@@ -1,11 +1,12 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using FluentAssertions;
 using IdentityModel.Client;
+using IdentityServer4.IntegrationTests.Common;
 using IdentityServer4.Models;
 using IdentityServer4.Services.InMemory;
-using IdentityServer4.Tests.Common;
 using System;
 using System.Collections.Generic;
 using System.Security.Claims;
@@ -13,7 +14,7 @@ using System.Threading.Tasks;
 using Xunit;
 
 
-namespace IdentityServer4.Tests.Conformance.Basic
+namespace IdentityServer4.IntegrationTests.Conformance.Basic
 {
     public class ClientAuthenticationTests 
     {
@@ -87,7 +88,7 @@ namespace IdentityServer4.Tests.Conformance.Basic
             var tokenResult = await tokenClient.RequestAuthorizationCodeAsync(code, "https://code_pipeline.Client/callback?foo=bar&baz=quux");
 
             tokenResult.IsError.Should().BeFalse();
-            tokenResult.IsHttpError.Should().BeFalse();
+            tokenResult.HttpErrorReason.Should().BeNull();
             tokenResult.TokenType.Should().Be("Bearer");
             tokenResult.AccessToken.Should().NotBeNull();
             tokenResult.ExpiresIn.Should().BeGreaterThan(0);
@@ -124,7 +125,7 @@ namespace IdentityServer4.Tests.Conformance.Basic
             var tokenResult = await tokenClient.RequestAuthorizationCodeAsync(code, "https://code_pipeline.Client/callback?foo=bar&baz=quux");
 
             tokenResult.IsError.Should().BeFalse();
-            tokenResult.IsHttpError.Should().BeFalse();
+            tokenResult.HttpErrorReason.Should().BeNull();
             tokenResult.TokenType.Should().Be("Bearer");
             tokenResult.AccessToken.Should().NotBeNull();
             tokenResult.ExpiresIn.Should().BeGreaterThan(0);

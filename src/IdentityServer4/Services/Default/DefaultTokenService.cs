@@ -1,10 +1,12 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityModel;
+using IdentityServer4.Events;
 using IdentityServer4.Extensions;
-using IdentityServer4.Hosting;
 using IdentityServer4.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -27,19 +29,19 @@ namespace IdentityServer4.Services.Default
         private readonly ILogger _logger;
 
         /// <summary>
-        /// The identity server context
+        /// The HTTP context accessor
         /// </summary>
-        protected readonly IdentityServerContext _context;
+        protected readonly IHttpContextAccessor _context;
 
         /// <summary>
         /// The claims provider
         /// </summary>
-        protected readonly IClaimsProvider _claimsProvider;
+        protected readonly IClaimsService _claimsProvider;
 
         /// <summary>
-        /// The token handles
+        /// The persisted grants
         /// </summary>
-        protected readonly ITokenHandleStore _tokenHandles;
+        protected readonly IPersistedGrantService _grants;
 
         /// <summary>
         /// The signing service
@@ -50,24 +52,22 @@ namespace IdentityServer4.Services.Default
         /// The events service
         /// </summary>
         protected readonly IEventService _events;
-        
-        // todo
-        //protected readonly OwinEnvironmentService _owinEnvironmentService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DefaultTokenService" /> class. This overloaded constructor is deprecated and will be removed in 3.0.0.
         /// </summary>
-        /// <param name="options">The options.</param>
+        /// <param name="context">The context.</param>
         /// <param name="claimsProvider">The claims provider.</param>
-        /// <param name="tokenHandles">The token handles.</param>
+        /// <param name="grants">The grants.</param>
         /// <param name="creationService">The signing service.</param>
         /// <param name="events">The events service.</param>
-        public DefaultTokenService(IdentityServerContext context, IClaimsProvider claimsProvider, ITokenHandleStore tokenHandles, ITokenCreationService creationService, IEventService events, ILogger<DefaultTokenService> logger)
+        /// <param name="logger">The logger.</param>
+        public DefaultTokenService(IHttpContextAccessor context, IClaimsService claimsProvider, IPersistedGrantService grants, ITokenCreationService creationService, IEventService events, ILogger<DefaultTokenService> logger)
         {
             _logger = logger;
             _context = context;
             _claimsProvider = claimsProvider;
-            _tokenHandles = tokenHandles;
+            _grants = grants;
             _creationService = creationService;
             _events = events;
         }
@@ -94,7 +94,7 @@ namespace IdentityServer4.Services.Default
             }
 
             // add iat claim
-            claims.Add(new Claim(JwtClaimTypes.IssuedAt, DateTimeOffsetHelper.UtcNow.ToEpochTime().ToString(), ClaimValueTypes.Integer));
+            claims.Add(new Claim(JwtClaimTypes.IssuedAt, DateTimeHelper.UtcNow.ToEpochTime().ToString(), ClaimValueTypes.Integer));
 
             // add at_hash claim
             if (request.AccessTokenToHash.IsPresent())
@@ -121,7 +121,7 @@ namespace IdentityServer4.Services.Default
                 request.IncludeAllIdentityClaims,
                 request.ValidatedRequest));
 
-            var issuer = _context.GetIssuerUri();
+            var issuer = _context.HttpContext.GetIssuerUri();
 
             var token = new Token(OidcConstants.TokenTypes.IdentityToken)
             {
@@ -129,7 +129,8 @@ namespace IdentityServer4.Services.Default
                 Issuer = issuer,
                 Lifetime = request.Client.IdentityTokenLifetime,
                 Claims = claims.Distinct(new ClaimComparer()).ToList(),
-                Client = request.Client
+                ClientId = request.Client.ClientId,
+                AccessTokenType = request.Client.AccessTokenType
             };
 
             return token;
@@ -159,14 +160,15 @@ namespace IdentityServer4.Services.Default
                 claims.Add(new Claim(JwtClaimTypes.JwtId, CryptoRandom.CreateUniqueId()));
             }
 
-            var issuer = _context.GetIssuerUri();
+            var issuer = _context.HttpContext.GetIssuerUri();
             var token = new Token(OidcConstants.TokenTypes.AccessToken)
             {
                 Audience = string.Format(Constants.AccessTokenAudience, issuer.EnsureTrailingSlash()),
                 Issuer = issuer,
                 Lifetime = request.Client.AccessTokenLifetime,
                 Claims = claims.Distinct(new ClaimComparer()).ToList(),
-                Client = request.Client
+                ClientId = request.Client.ClientId,
+                AccessTokenType = request.Client.AccessTokenType
             };
 
             return token;
@@ -186,7 +188,7 @@ namespace IdentityServer4.Services.Default
 
             if (token.Type == OidcConstants.TokenTypes.AccessToken)
             {
-                if (token.Client.AccessTokenType == AccessTokenType.Jwt)
+                if (token.AccessTokenType == AccessTokenType.Jwt)
                 {
                     _logger.LogTrace("Creating JWT access token");
 
@@ -197,7 +199,7 @@ namespace IdentityServer4.Services.Default
                     _logger.LogTrace("Creating reference access token");
 
                     var handle = CryptoRandom.CreateUniqueId();
-                    await _tokenHandles.StoreAsync(handle, token);
+                    await _grants.StoreReferenceTokenAsync(handle, token);
 
                     tokenResult = handle;
                 }

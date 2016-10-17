@@ -1,12 +1,14 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using FluentAssertions;
 using IdentityModel;
 using IdentityServer4.Configuration;
 using IdentityServer4.Models;
 using IdentityServer4.ResponseHandling;
-using IdentityServer4.Services.InMemory;
+using IdentityServer4.Stores.InMemory;
+using IdentityServer4.UnitTests.Common;
 using IdentityServer4.Validation;
 using Microsoft.Extensions.Logging;
 using System;
@@ -14,10 +16,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using UnitTests.Common;
 using Xunit;
 
-namespace IdentityServer4.Tests.ResponseHandling
+namespace IdentityServer4.UnitTests.ResponseHandling
 {
     public class AuthorizeInteractionResponseGeneratorTests_Consent
     {
@@ -25,7 +26,6 @@ namespace IdentityServer4.Tests.ResponseHandling
         IdentityServerOptions _options = new IdentityServerOptions();
         MockConsentService _mockConsent = new MockConsentService();
         TestProfileService _fakeUserService = new TestProfileService();
-        TestLocalizationService _fakeLocalizationService = new TestLocalizationService();
 
         void RequiresConsent(bool value)
         {
@@ -44,13 +44,6 @@ namespace IdentityServer4.Tests.ResponseHandling
             _mockConsent.ConsentClient.Should().BeSameAs(client);
             _mockConsent.ConsentSubject.Should().BeSameAs(user);
             _mockConsent.ConsentScopes.Should().BeEquivalentTo(scopes);
-        }
-
-        private void AssertErrorReturnsRequestValues(AuthorizeError error, ValidatedAuthorizeRequest request)
-        {
-            error.ResponseMode.Should().Be(request.ResponseMode);
-            error.ErrorUri.Should().Be(request.RedirectUri);
-            error.State.Should().Be(request.State);
         }
 
         private static IEnumerable<Scope> GetScopes()
@@ -91,8 +84,7 @@ namespace IdentityServer4.Tests.ResponseHandling
                 TestLogger.Create<AuthorizeInteractionResponseGenerator>(),
                 _options,
                 _mockConsent,
-                _fakeUserService,
-                _fakeLocalizationService);
+                _fakeUserService);
         }
 
         [Fact]
@@ -169,9 +161,7 @@ namespace IdentityServer4.Tests.ResponseHandling
 
             request.WasConsentShown.Should().BeFalse();
             result.IsError.Should().BeTrue();
-            result.Error.ErrorType.Should().Be(ErrorTypes.Client);
-            result.Error.Error.Should().Be(OidcConstants.AuthorizeErrors.ConsentRequired);
-            AssertErrorReturnsRequestValues(result.Error, request);
+            result.Error.Should().Be(OidcConstants.AuthorizeErrors.ConsentRequired);
             AssertUpdateConsentNotCalled();
         }
         
@@ -227,9 +217,7 @@ namespace IdentityServer4.Tests.ResponseHandling
             var result = _subject.ProcessConsentAsync(request, consent).Result;
             request.WasConsentShown.Should().BeTrue();
             result.IsError.Should().BeTrue();
-            result.Error.ErrorType.Should().Be(ErrorTypes.Client);
-            result.Error.Error.Should().Be(OidcConstants.AuthorizeErrors.AccessDenied);
-            AssertErrorReturnsRequestValues(result.Error, request);
+            result.Error.Should().Be(OidcConstants.AuthorizeErrors.AccessDenied);
             AssertUpdateConsentNotCalled();
         }
 
@@ -251,9 +239,7 @@ namespace IdentityServer4.Tests.ResponseHandling
             var result = _subject.ProcessConsentAsync(request, consent).Result;
             request.WasConsentShown.Should().BeTrue();
             result.IsError.Should().BeTrue();
-            result.Error.ErrorType.Should().Be(ErrorTypes.Client);
-            result.Error.Error.Should().Be(OidcConstants.AuthorizeErrors.AccessDenied);
-            AssertErrorReturnsRequestValues(result.Error, request);
+            result.Error.Should().Be(OidcConstants.AuthorizeErrors.AccessDenied);
             AssertUpdateConsentNotCalled();
         }
 
@@ -262,7 +248,7 @@ namespace IdentityServer4.Tests.ResponseHandling
         {
             RequiresConsent(true);
             var client = new Client {};
-            var scopeValidator = new ScopeValidator(new InMemoryScopeStore(GetScopes()), new LoggerFactory().CreateLogger<ScopeValidator>());
+            var scopeValidator = new ScopeValidator(new InMemoryScopeStore(GetScopes()), TestLogger.Create<ScopeValidator>());
             var request = new ValidatedAuthorizeRequest()
             {
                 ResponseMode = OidcConstants.ResponseModes.Fragment,
@@ -282,9 +268,7 @@ namespace IdentityServer4.Tests.ResponseHandling
 
             var result = _subject.ProcessConsentAsync(request, consent).Result;
             result.IsError.Should().BeTrue();
-            result.Error.ErrorType.Should().Be(ErrorTypes.Client);
-            result.Error.Error.Should().Be(OidcConstants.AuthorizeErrors.AccessDenied);
-            AssertErrorReturnsRequestValues(result.Error, request);
+            result.Error.Should().Be(OidcConstants.AuthorizeErrors.AccessDenied);
             AssertUpdateConsentNotCalled();
         }
 

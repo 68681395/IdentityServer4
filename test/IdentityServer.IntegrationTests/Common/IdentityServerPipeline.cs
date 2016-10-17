@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityServer4.Configuration;
 using IdentityServer4.Models;
 using IdentityServer4.Services.InMemory;
@@ -12,7 +13,7 @@ using System;
 using System.Collections.Generic;
 using System.Net.Http;
 
-namespace IdentityServer4.Tests.Common
+namespace IdentityServer4.IntegrationTests.Common
 {
     public class IdentityServerPipeline
     {
@@ -32,7 +33,7 @@ namespace IdentityServer4.Tests.Common
         public const string EndSessionCallbackEndpoint = "https://server/connect/endsession/callback";
         public const string CheckSessionEndpoint = "https://server/connect/checksession";
 
-        public IdentityServerOptions Options { get; set; } = new IdentityServerOptions();
+        public IdentityServerOptions Options { get; set; }
         public List<Client> Clients { get; set; } = new List<Client>();
         public List<Scope> Scopes { get; set; } = new List<Scope>();
         public List<InMemoryUser> Users { get; set; } = new List<InMemoryUser>();
@@ -78,11 +79,21 @@ namespace IdentityServer4.Tests.Common
 
             services.AddDataProtection();
 
-            services.AddIdentityServer(Options)
-                .AddInMemoryClients(Clients)
-                .AddInMemoryScopes(Scopes)
-                .AddInMemoryUsers(Users)
-                .SetSigningCredential(Cert.Load());
+            services.AddDeveloperIdentityServer(options =>
+            {
+                Options = options;
+
+                options.EventsOptions = new EventsOptions
+                {
+                    RaiseErrorEvents = true,
+                    RaiseFailureEvents = true,
+                    RaiseInformationEvents = true,
+                    RaiseSuccessEvents = true
+                };
+            })
+            .AddInMemoryClients(Clients)
+            .AddInMemoryScopes(Scopes)
+            .AddInMemoryUsers(Users);
         }
 
         public event Action<IApplicationBuilder> OnPreConfigure = x => { };

@@ -1,4 +1,8 @@
-﻿using IdentityServer4.Models;
+﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
+// Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
+
+
+using IdentityServer4.Models;
 using System.Collections.Generic;
 
 namespace Host.Configuration
@@ -22,11 +26,11 @@ namespace Host.Configuration
                     Description = "API 1 features and data",
                     Type = ScopeType.Resource,
 
-                    ScopeSecrets = new List<Secret>
+                    ScopeSecrets =
                     {
                         new Secret("secret".Sha256())
                     },
-                    Claims = new List<ScopeClaim>
+                    Claims =
                     {
                         new ScopeClaim("role")
                     }

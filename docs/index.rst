@@ -28,6 +28,10 @@ Focus on Customization
 The most important part - many aspect of IdentityServer can be customized to fit **your** needs.
 Since IdentityServer is a framework and not a boxed product or a SaaS, you can write code to adapt the system the way it makes sense for your scenarios.
 
+Commercial Support Services
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+If you need help building or running your identity platform, let us know. Head over to `identityserver.com <https://www.identityserver.com>`_ for more information.
+
 .. toctree::
    :maxdepth: 2
    :hidden:
@@ -41,19 +45,39 @@ Since IdentityServer is a framework and not a boxed product or a SaaS, you can w
 .. toctree::
    :maxdepth: 2
    :hidden:
-   :caption: Getting started
+   :caption: Quickstarts
 
-   start/scopes
-   start/clients
-   start/mvc
-   start/apis
+   quickstarts/0_overview
+   quickstarts/1_client_credentials
+   quickstarts/2_resource_owner_passwords
+   quickstarts/3_interactive_login
+   quickstarts/4_external_authentication
+   quickstarts/5_hybrid_and_api_access
+   quickstarts/6_aspnet_identity
+   quickstarts/7_javascript_client
+   quickstarts/8_entity_framework
+
+.. toctree::
+   :maxdepth: 2
+   :hidden:
+   :caption: Configuration
+
+   configuration/services
+   configuration/pipelines
+   configuration/scopes
+   configuration/clients
+   configuration/mvc
+   configuration/apis
 
 .. toctree::
    :maxdepth: 2
    :hidden:
    :caption: Topics
 
+   topics/grant_types
    topics/secrets
+   topics/extension_grants
+   topics/resource_owner
    topics/crypto
    topics/deployment
    topics/idps
@@ -61,7 +85,6 @@ Since IdentityServer is a framework and not a boxed product or a SaaS, you can w
    topics/logging
    topics/refresh_tokens
    topics/reference_tokens
-   topics/extension_grants
 
 .. toctree::
    :maxdepth: 2
@@ -81,3 +104,12 @@ Since IdentityServer is a framework and not a boxed product or a SaaS, you can w
 
    reference/scope
    reference/client
+   reference/grant_validation_result
+
+.. toctree::
+   :maxdepth: 2
+   :hidden:
+   :caption: Misc
+
+   misc/blogs
+   misc/videos

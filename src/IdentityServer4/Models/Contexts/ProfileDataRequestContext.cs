@@ -1,8 +1,8 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using System.Collections.Generic;
-using System.Linq;
 using System.Security.Claims;
 using IdentityServer4.Extensions;
 
@@ -17,9 +17,7 @@ namespace IdentityServer4.Models
         /// Initializes a new instance of the <see cref="ProfileDataRequestContext"/> class.
         /// </summary>
         public ProfileDataRequestContext()
-        {
-            IssuedClaims = Enumerable.Empty<Claim>();
-        }
+        { }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ProfileDataRequestContext" /> class.
@@ -42,8 +40,6 @@ namespace IdentityServer4.Models
             {
                 RequestedClaimTypes = requestedClaimTypes;
             }
-
-            IssuedClaims = Enumerable.Empty<Claim>();
         }
 
         /// <summary>
@@ -92,6 +88,6 @@ namespace IdentityServer4.Models
         /// <value>
         /// The issued claims.
         /// </value>
-        public IEnumerable<Claim> IssuedClaims { get; set; }
+        public List<Claim> IssuedClaims { get; set; } = new List<Claim>();
     }
 }

@@ -1,15 +1,15 @@
-﻿using FluentAssertions;
-using IdentityServer4.Tests.Validation;
+﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
+// Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
+
+
+using FluentAssertions;
 using Microsoft.AspNetCore.Http;
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace IdentityServer.UnitTests.Validation.Secrets
+namespace IdentityServer4.UnitTests.Validation.Secrets
 {
     public class ClientSecretValidation
     {
@@ -66,7 +66,7 @@ namespace IdentityServer.UnitTests.Validation.Secrets
 
             result.IsError.Should().BeFalse();
             result.Client.ClientId.Should().Be("roclient.public");
-            result.Client.PublicClient.Should().BeTrue();
+            result.Client.RequireClientSecret.Should().BeFalse();
         }
 
     }

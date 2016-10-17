@@ -1,30 +1,33 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityServer4.Extensions;
 using IdentityServer4.Models;
 using Microsoft.Extensions.DependencyInjection;
 using System.Threading.Tasks;
-using System;
 using System.Linq;
 using IdentityServer4.Services;
 using System.Security.Claims;
 using IdentityModel.Client;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Builder;
-using IdentityServer4.Validation;
 using FluentAssertions;
 using System.Net;
-using System.Net.Http;
+using IdentityServer4.Configuration;
 
-namespace IdentityServer4.Tests.Common
+namespace IdentityServer4.IntegrationTests.Common
 {
     public class MockIdSvrUiPipeline : IdentityServerPipeline
     {
+        public const string FederatedSignOutPath = "/signout-oidc";
+        public const string FederatedSignOutUrl = "https://server" + FederatedSignOutPath;
+
         public RequestDelegate Login { get; set; }
         public RequestDelegate Logout { get; set; }
         public RequestDelegate Consent { get; set; }
         public RequestDelegate Error { get; set; }
+        public RequestDelegate FederatedSignOut { get; set; }
 
         public MockIdSvrUiPipeline()
         {
@@ -32,6 +35,7 @@ namespace IdentityServer4.Tests.Common
             Logout = OnLogout;
             Consent = OnConsent;
             Error = OnError;
+            FederatedSignOut = OnFederatedSignOut;
 
             this.OnConfigureServices += MockAuthorizationPipeline_OnConfigureServices;
             this.OnPreConfigure += MockAuthorizationPipeline_OnPreConfigure;
@@ -46,7 +50,8 @@ namespace IdentityServer4.Tests.Common
         {
             if (CookieAuthenticationScheme != null)
             {
-                this.Options.AuthenticationOptions.AuthenticationScheme = CookieAuthenticationScheme;
+                var idSvrOptions = app.ApplicationServices.GetRequiredService<IdentityServerOptions>();
+                idSvrOptions.AuthenticationOptions.AuthenticationScheme = CookieAuthenticationScheme;
                 app.UseCookieAuthentication(new CookieAuthenticationOptions
                 {
                     AuthenticationScheme = CookieAuthenticationScheme
@@ -75,6 +80,11 @@ namespace IdentityServer4.Tests.Common
             {
                 path.Run(ctx => Error(ctx));
             });
+
+            app.Map(FederatedSignOutPath, path =>
+            {
+                path.Run(ctx => FederatedSignOut(ctx));
+            });
         }
 
         public string CookieAuthenticationScheme { get; set; } = "cookie_authn";
@@ -93,8 +103,8 @@ namespace IdentityServer4.Tests.Common
 
         async Task ReadLoginRequest(HttpContext ctx)
         {
-            var interaction = ctx.RequestServices.GetRequiredService<IUserInteractionService>();
-            LoginRequest = await interaction.GetLoginContextAsync();
+            var interaction = ctx.RequestServices.GetRequiredService<IIdentityServerInteractionService>();
+            LoginRequest = await interaction.GetAuthorizationContextAsync(ctx.Request.Query["returnUrl"].FirstOrDefault());
         }
 
         async Task IssueLoginCookie(HttpContext ctx)
@@ -122,8 +132,8 @@ namespace IdentityServer4.Tests.Common
 
         private async Task ReadLogoutRequest(HttpContext ctx)
         {
-            var interaction = ctx.RequestServices.GetRequiredService<IUserInteractionService>();
-            LogoutRequest = await interaction.GetLogoutContextAsync();
+            var interaction = ctx.RequestServices.GetRequiredService<IIdentityServerInteractionService>();
+            LogoutRequest = await interaction.GetLogoutContextAsync(ctx.Request.Query["logoutId"].FirstOrDefault());
         }
 
         public bool ConsentWasCalled { get; set; }
@@ -139,15 +149,15 @@ namespace IdentityServer4.Tests.Common
 
         async Task ReadConsentMessage(HttpContext ctx)
         {
-            var interaction = ctx.RequestServices.GetRequiredService<IUserInteractionService>();
-            ConsentRequest = await interaction.GetConsentContextAsync();
+            var interaction = ctx.RequestServices.GetRequiredService<IIdentityServerInteractionService>();
+            ConsentRequest = await interaction.GetAuthorizationContextAsync(ctx.Request.Query["returnUrl"].FirstOrDefault());
         }
 
         async Task CreateConsentResponse(HttpContext ctx)
         {
             if (ConsentRequest != null && ConsentResponse != null)
             {
-                var interaction = ctx.RequestServices.GetRequiredService<IUserInteractionService>();
+                var interaction = ctx.RequestServices.GetRequiredService<IIdentityServerInteractionService>();
                 await interaction.GrantConsentAsync(ConsentRequest, ConsentResponse);
                 ConsentResponse = null;
 
@@ -170,8 +180,13 @@ namespace IdentityServer4.Tests.Common
 
         async Task ReadErrorMessage(HttpContext ctx)
         {
-            var interaction = ctx.RequestServices.GetRequiredService<IUserInteractionService>();
-            ErrorMessage = await interaction.GetErrorContextAsync();
+            var interaction = ctx.RequestServices.GetRequiredService<IIdentityServerInteractionService>();
+            ErrorMessage = await interaction.GetErrorContextAsync(ctx.Request.Query["errorId"].FirstOrDefault());
+        }
+
+        Task OnFederatedSignOut(HttpContext ctx)
+        {
+            return Task.FromResult(0);
         }
 
         /* helpers */
@@ -200,6 +215,10 @@ namespace IdentityServer4.Tests.Common
         public void RemoveSessionCookie()
         {
             BrowserClient.RemoveCookie("https://server/", "idsvr.session");
+        }
+        public Cookie GetSessionCookie()
+        {
+            return BrowserClient.GetCookie("https://server/", "idsvr.session");
         }
 
         public string CreateAuthorizeUrl(
@@ -263,17 +282,11 @@ namespace IdentityServer4.Tests.Common
             var redirect = result.Headers.Location.ToString();
             if (redirect.StartsWith(IdentityServerPipeline.ErrorPage))
             {
+                // request error page in pipeline so we can get error info
                 await BrowserClient.GetAsync(redirect);
-                redirect = ErrorMessage?.ReturnInfo?.Uri;
-                if (redirect != null && redirect.EndsWith("#_=_"))
-                {
-                    redirect = redirect.Substring(0, redirect.Length - 4);
-                }
-                else
-                {
-                    // no redirect to client
-                    return null;
-                }
+                
+                // no redirect to client
+                return null;
             }
 
             return new IdentityModel.Client.AuthorizeResponse(redirect);

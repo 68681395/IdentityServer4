@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 namespace IdentityServer4.Models
 {
     public class DiscoveryDocument
@@ -14,7 +15,8 @@ namespace IdentityServer4.Models
         public string check_session_iframe { get; set; }
         public string revocation_endpoint { get; set; }
         public string introspection_endpoint { get; set; }
-        public bool? http_logout_supported { get; set; }
+        public bool? frontchannel_logout_supported { get; set; }
+        public bool? frontchannel_logout_session_supported { get; set; }
         public string[] scopes_supported { get; set; }
         public string[] claims_supported { get; set; }
         public string[] response_types_supported { get; set; }

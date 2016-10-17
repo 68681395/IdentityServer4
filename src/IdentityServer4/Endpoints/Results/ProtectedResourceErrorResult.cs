@@ -1,11 +1,12 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using System.Threading.Tasks;
 using IdentityServer4.Extensions;
 using Microsoft.Extensions.Primitives;
 using IdentityServer4.Hosting;
-using Microsoft.AspNet.Http;
+using Microsoft.AspNetCore.Http;
 
 namespace IdentityServer4.Endpoints.Results
 {
@@ -20,14 +21,14 @@ namespace IdentityServer4.Endpoints.Results
             ErrorDescription = errorDescription;
         }
 
-        public Task ExecuteAsync(IdentityServerContext context)
+        public Task ExecuteAsync(HttpContext context)
         {
-            context.HttpContext.Response.StatusCode = 401;
-            context.HttpContext.Response.SetNoCache();
+            context.Response.StatusCode = 401;
+            context.Response.SetNoCache();
 
             if (Constants.ProtectedResourceErrorStatusCodes.ContainsKey(Error))
             {
-                context.HttpContext.Response.StatusCode = Constants.ProtectedResourceErrorStatusCodes[Error];
+                context.Response.StatusCode = Constants.ProtectedResourceErrorStatusCodes[Error];
             }
 
             var parameter = string.Format("error=\"{0}\"", Error);
@@ -37,7 +38,7 @@ namespace IdentityServer4.Endpoints.Results
                     parameter, ErrorDescription);
             }
 
-            context.HttpContext.Response.Headers.Add("WwwAuthentication", new StringValues("Bearer"));
+            context.Response.Headers.Add("WwwAuthentication", new StringValues("Bearer"));
             //TODO logger.LogInformation("Returning error: " + Error);
 
             return Task.FromResult(0);

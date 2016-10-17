@@ -1,10 +1,11 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityServer4.Models;
 using System.Collections.Generic;
 
-namespace IdentityServer4.Tests.Clients
+namespace IdentityServer4.IntegrationTests.Clients
 {
     class Scopes
     {
@@ -16,6 +17,7 @@ namespace IdentityServer4.Tests.Clients
                 StandardScopes.Email,
                 StandardScopes.OfflineAccess,
                 StandardScopes.Address,
+                StandardScopes.Roles,
 
                 new Scope
                 {
@@ -36,6 +38,15 @@ namespace IdentityServer4.Tests.Clients
                 {
                     Name = "api3",
                     Type = ScopeType.Resource
+                },
+                new Scope
+                {
+                    Name = "api4.with.roles",
+                    Type = ScopeType.Resource,
+                    Claims = new List<ScopeClaim>
+                    {
+                        new ScopeClaim("role")
+                    }
                 }
             };
         }

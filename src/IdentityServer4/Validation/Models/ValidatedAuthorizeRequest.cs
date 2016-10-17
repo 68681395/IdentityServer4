@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityModel;
 using IdentityServer4.Models;
 using System.Collections.Generic;
@@ -178,17 +179,11 @@ namespace IdentityServer4.Validation
         /// <value>
         /// <c>true</c> if an access token was requested; otherwise, <c>false</c>.
         /// </value>
-        public bool AccessTokenRequested
-        {
-            get
-            {
-                return (ResponseType == OidcConstants.ResponseTypes.IdTokenToken ||
-                        ResponseType == OidcConstants.ResponseTypes.Code ||
-                        ResponseType == OidcConstants.ResponseTypes.CodeIdToken ||
-                        ResponseType == OidcConstants.ResponseTypes.CodeToken ||
-                        ResponseType == OidcConstants.ResponseTypes.CodeIdTokenToken);
-            }
-        }
+        public bool AccessTokenRequested => (ResponseType == OidcConstants.ResponseTypes.IdTokenToken ||
+                                             ResponseType == OidcConstants.ResponseTypes.Code ||
+                                             ResponseType == OidcConstants.ResponseTypes.CodeIdToken ||
+                                             ResponseType == OidcConstants.ResponseTypes.CodeToken ||
+                                             ResponseType == OidcConstants.ResponseTypes.CodeIdTokenToken);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValidatedAuthorizeRequest"/> class.

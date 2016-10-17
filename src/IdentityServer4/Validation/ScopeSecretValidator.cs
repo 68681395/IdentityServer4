@@ -1,9 +1,10 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityServer4.Events;
-using IdentityServer4.Extensions;
 using IdentityServer4.Services;
+using IdentityServer4.Stores;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using System.Linq;
@@ -47,7 +48,7 @@ namespace IdentityServer4.Validation
             }
 
             // load scope
-            var scope = (await _scopes.FindScopesAsync(new[] { parsedSecret.Id })).FirstOrDefault();
+            var scope = (await _scopes.FindEnabledScopesAsync(new[] { parsedSecret.Id })).FirstOrDefault();
             if (scope == null)
             {
                 await RaiseFailureEvent(parsedSecret.Id, "Unknown scope");
@@ -59,7 +60,7 @@ namespace IdentityServer4.Validation
             var result = await _validator.ValidateAsync(parsedSecret, scope.ScopeSecrets);
             if (result.Success)
             {
-                _logger.LogInformation("Scope validation success");
+                _logger.LogDebug("Scope validation success");
 
                 var success = new ScopeSecretValidationResult
                 {

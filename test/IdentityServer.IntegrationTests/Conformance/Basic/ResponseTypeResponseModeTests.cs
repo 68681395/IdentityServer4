@@ -1,10 +1,11 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using FluentAssertions;
+using IdentityServer4.IntegrationTests.Common;
 using IdentityServer4.Models;
 using IdentityServer4.Services.InMemory;
-using IdentityServer4.Tests.Common;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -12,7 +13,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace IdentityServer4.Tests.Conformance.Basic
+namespace IdentityServer4.IntegrationTests.Conformance.Basic
 {
     public class ResponseTypeResponseModeTests
     {
@@ -86,8 +87,11 @@ namespace IdentityServer4.Tests.Conformance.Basic
             authorization.State.Should().Be(state);
         }
 
-       [Fact(Skip = "Not sure if this is following conformance since we don't redirect back to client")]
-       [Trait("Category", Category)]
+        // this might not be in sync with the actual conformance tests
+        // since we dead-end on the error page due to changes 
+        // to follow the RFC to address open redirect in original OAuth RFC
+        [Fact]
+        [Trait("Category", Category)]
         public async Task Request_missing_response_type_rejected()
         {
             await _mockPipeline.LoginAsync("bob");
@@ -97,7 +101,7 @@ namespace IdentityServer4.Tests.Conformance.Basic
 
             var url = _mockPipeline.CreateAuthorizeUrl(
                 clientId: "code_client",
-                responseType: null,
+                responseType: null, // missing
                 scope: "openid",
                 redirectUri: "https://code_client/callback",
                 state: state,
@@ -106,7 +110,7 @@ namespace IdentityServer4.Tests.Conformance.Basic
             _mockPipeline.BrowserClient.AllowAutoRedirect = true;
             var response = await _mockPipeline.BrowserClient.GetAsync(url);
 
-            _mockPipeline.ErrorMessage.ErrorCode.Should().Be("unsupported_response_type");
+            _mockPipeline.ErrorMessage.Error.Should().Be("unsupported_response_type");
         }
     }
 }

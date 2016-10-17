@@ -1,16 +1,23 @@
-﻿using IdentityServer4.Hosting;
+﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
+// Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
+
+
 using System;
 using System.Diagnostics;
 using IdentityModel;
+using Microsoft.AspNetCore.Http;
+using IdentityServer4.Configuration;
 
 namespace IdentityServer4.Events
 {
     public class EventServiceHelper
     {
-        private readonly IdentityServerContext _context;
+        private readonly IdentityServerOptions _options;
+        private readonly IHttpContextAccessor _context;
 
-        public EventServiceHelper(IdentityServerContext context)
+        public EventServiceHelper(IdentityServerOptions options, IHttpContextAccessor context)
         {
+            _options = options;
             _context = context;
         }
 
@@ -19,13 +26,13 @@ namespace IdentityServer4.Events
             switch (evt.EventType)
             {
                 case EventTypes.Failure:
-                    return _context.Options.EventsOptions.RaiseFailureEvents;
+                    return _options.EventsOptions.RaiseFailureEvents;
                 case EventTypes.Information:
-                    return _context.Options.EventsOptions.RaiseInformationEvents;
+                    return _options.EventsOptions.RaiseInformationEvents;
                 case EventTypes.Success:
-                    return _context.Options.EventsOptions.RaiseSuccessEvents;
+                    return _options.EventsOptions.RaiseSuccessEvents;
                 case EventTypes.Error:
-                    return _context.Options.EventsOptions.RaiseErrorEvents;
+                    return _options.EventsOptions.RaiseErrorEvents;
             }
 
             return false;
@@ -38,11 +45,18 @@ namespace IdentityServer4.Events
             evt.Context = new EventContext
             {
                 ActivityId = _context.HttpContext.TraceIdentifier,
-                TimeStamp = DateTimeOffset.UtcNow,
+                TimeStamp = DateTimeHelper.UtcNow,
                 ProcessId = Process.GetCurrentProcess().Id,
-                //MachineName = Environment..MachineName,
-                RemoteIpAddress = _context.HttpContext.Connection.RemoteIpAddress.ToString()
             };
+
+            if (_context.HttpContext.Connection.RemoteIpAddress != null)
+            {
+                evt.Context.RemoteIpAddress = _context.HttpContext.Connection.RemoteIpAddress.ToString();
+            }
+            else
+            {
+                evt.Context.RemoteIpAddress = "unknown";
+            }
 
             var principal = _context.HttpContext.User;
             if (principal != null && principal.Identity != null)

@@ -1,15 +1,16 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using FluentAssertions;
 using IdentityModel;
 using IdentityServer4.Configuration;
-using IdentityServer4.Validation;
+using IdentityServer4.UnitTests.Common;
 using System.Collections.Specialized;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace IdentityServer4.Tests.Validation.AuthorizeRequest
+namespace IdentityServer4.UnitTests.Validation.AuthorizeRequest
 {
     public class Authorize_ProtocolValidation_Valid_PKCE
     {
@@ -87,7 +88,6 @@ namespace IdentityServer4.Tests.Validation.AuthorizeRequest
             result.IsError.Should().Be(true);
             result.Error.Should().Be(OidcConstants.AuthorizeErrors.InvalidRequest);
             result.ErrorDescription.Should().Be("code challenge required");
-            result.ErrorType.Should().Be(ErrorTypes.Client);
         }
 
         [Fact]
@@ -106,7 +106,6 @@ namespace IdentityServer4.Tests.Validation.AuthorizeRequest
             result.IsError.Should().Be(true);
             result.Error.Should().Be(OidcConstants.AuthorizeErrors.InvalidRequest);
             result.ErrorDescription.Should().Be("code challenge required");
-            result.ErrorType.Should().Be(ErrorTypes.Client);
         }
 
         [Fact]
@@ -127,7 +126,6 @@ namespace IdentityServer4.Tests.Validation.AuthorizeRequest
             result.IsError.Should().Be(true);
             result.Error.Should().Be(OidcConstants.AuthorizeErrors.InvalidRequest);
             result.ErrorDescription.Should().Be("transform algorithm not supported");
-            result.ErrorType.Should().Be(ErrorTypes.Client);
         }
 
         [Fact]
@@ -147,7 +145,6 @@ namespace IdentityServer4.Tests.Validation.AuthorizeRequest
 
             result.IsError.Should().Be(true);
             result.Error.Should().Be(OidcConstants.AuthorizeErrors.InvalidRequest);
-            result.ErrorType.Should().Be(ErrorTypes.Client);
         }
 
         [Fact]
@@ -167,7 +164,6 @@ namespace IdentityServer4.Tests.Validation.AuthorizeRequest
 
             result.IsError.Should().Be(true);
             result.Error.Should().Be(OidcConstants.AuthorizeErrors.InvalidRequest);
-            result.ErrorType.Should().Be(ErrorTypes.Client);
         }
     }
 }

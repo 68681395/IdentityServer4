@@ -1,10 +1,12 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityModel;
 using IdentityServer4.Extensions;
 using IdentityServer4.Models;
 using IdentityServer4.Services;
+using IdentityServer4.Stores;
 using IdentityServer4.Validation;
 using Microsoft.Extensions.Logging;
 using System;
@@ -15,34 +17,36 @@ namespace IdentityServer4.ResponseHandling
 {
     public class TokenResponseGenerator : ITokenResponseGenerator
     {
-        private ILogger _logger;
+        private readonly ILogger _logger;
         private readonly ITokenService _tokenService;
         private readonly IRefreshTokenService _refreshTokenService;
         private readonly IScopeStore _scopes;
+        private readonly IClientStore _clients;
        
-        public TokenResponseGenerator(ITokenService tokenService, IRefreshTokenService refreshTokenService, IScopeStore scopes, ILoggerFactory loggerFactory)
+        public TokenResponseGenerator(ITokenService tokenService, IRefreshTokenService refreshTokenService, IScopeStore scopes, IClientStore clients, ILoggerFactory loggerFactory)
         {
             _tokenService = tokenService;
             _refreshTokenService = refreshTokenService;
             _scopes = scopes;
+            _clients = clients;
             _logger = loggerFactory.CreateLogger<TokenResponseGenerator>();
         }
 
-        public async Task<TokenResponse> ProcessAsync(ValidatedTokenRequest request)
+        public async Task<TokenResponse> ProcessAsync(TokenRequestValidationResult validationResult)
         {
             _logger.LogTrace("Creating token response");
 
-            if (request.GrantType == OidcConstants.GrantTypes.AuthorizationCode)
+            if (validationResult.ValidatedRequest.GrantType == OidcConstants.GrantTypes.AuthorizationCode)
             {
-                return await ProcessAuthorizationCodeRequestAsync(request);
+                return await ProcessAuthorizationCodeRequestAsync(validationResult.ValidatedRequest);
             }
 
-            if (request.GrantType == OidcConstants.GrantTypes.RefreshToken)
+            if (validationResult.ValidatedRequest.GrantType == OidcConstants.GrantTypes.RefreshToken)
             {
-                return await ProcessRefreshTokenRequestAsync(request);
+                return await ProcessRefreshTokenRequestAsync(validationResult.ValidatedRequest);
             }
 
-            return await ProcessTokenRequestAsync(request);
+            return await ProcessTokenRequestAsync(validationResult);
         }
 
         private async Task<TokenResponse> ProcessAuthorizationCodeRequestAsync(ValidatedTokenRequest request)
@@ -72,11 +76,25 @@ namespace IdentityServer4.ResponseHandling
             /////////////////////////
             if (request.AuthorizationCode.IsOpenId)
             {
+                // load the client that belongs to the authorization code
+                Client client = null;
+                if (request.AuthorizationCode.ClientId != null)
+                {
+                    client = await _clients.FindEnabledClientByIdAsync(request.AuthorizationCode.ClientId);
+                }
+                if (client == null)
+                {
+                    throw new InvalidOperationException("Client does not exist anymore.");
+                }
+
+                var scopes = await _scopes.FindEnabledScopesAsync(request.AuthorizationCode.RequestedScopes);
+
+
                 var tokenRequest = new TokenCreationRequest
                 {
                     Subject = request.AuthorizationCode.Subject,
-                    Client = request.AuthorizationCode.Client,
-                    Scopes = request.AuthorizationCode.RequestedScopes,
+                    Client = client,
+                    Scopes = scopes,
                     Nonce = request.AuthorizationCode.Nonce,
 
                     ValidatedRequest = request
@@ -90,15 +108,16 @@ namespace IdentityServer4.ResponseHandling
             return response;
         }
 
-        private async Task<TokenResponse> ProcessTokenRequestAsync(ValidatedTokenRequest request)
+        private async Task<TokenResponse> ProcessTokenRequestAsync(TokenRequestValidationResult validationResult)
         {
             _logger.LogTrace("Processing token request");
 
-            var accessToken = await CreateAccessTokenAsync(request);
+            var accessToken = await CreateAccessTokenAsync(validationResult.ValidatedRequest);
             var response = new TokenResponse
             {
                 AccessToken = accessToken.Item1,
-                AccessTokenLifetime = request.Client.AccessTokenLifetime
+                AccessTokenLifetime = validationResult.ValidatedRequest.Client.AccessTokenLifetime,
+                Custom = validationResult.CustomResponse
             };
 
             if (accessToken.Item2.IsPresent())
@@ -118,14 +137,14 @@ namespace IdentityServer4.ResponseHandling
             
             if (request.Client.UpdateAccessTokenClaimsOnRefresh)
             {
-                var subject = request.RefreshToken.GetOriginalSubject();
+                var subject = request.RefreshToken.Subject;
 
                 var creationRequest = new TokenCreationRequest
                 {
                     Client = request.Client,
                     Subject = subject,
                     ValidatedRequest = request,
-                    Scopes = await _scopes.FindScopesAsync(oldAccessToken.Scopes)
+                    Scopes = await _scopes.FindEnabledScopesAsync(oldAccessToken.Scopes)
                 };
 
                 var newAccessToken = await _tokenService.CreateAccessTokenAsync(creationRequest);
@@ -133,7 +152,7 @@ namespace IdentityServer4.ResponseHandling
             }
             else
             {
-                oldAccessToken.CreationTime = DateTimeOffsetHelper.UtcNow;
+                oldAccessToken.CreationTime = DateTimeHelper.UtcNow;
                 oldAccessToken.Lifetime = request.Client.AccessTokenLifetime;
 
                 accessTokenString = await _tokenService.CreateSecurityTokenAsync(oldAccessToken);
@@ -156,13 +175,26 @@ namespace IdentityServer4.ResponseHandling
 
             if (request.AuthorizationCode != null)
             {
-                createRefreshToken = request.AuthorizationCode.RequestedScopes.Select(s => s.Name).Contains(Constants.StandardScopes.OfflineAccess);
-                
+                createRefreshToken = request.AuthorizationCode.RequestedScopes.Contains(Constants.StandardScopes.OfflineAccess);
+
+                // load the client that belongs to the authorization code
+                Client client = null;
+                if (request.AuthorizationCode.ClientId != null)
+                {
+                    client = await _clients.FindEnabledClientByIdAsync(request.AuthorizationCode.ClientId);
+                }
+                if (client == null)
+                {
+                    throw new InvalidOperationException("Client does not exist anymore.");
+                }
+
+                var scopes = await _scopes.FindEnabledScopesAsync(request.AuthorizationCode.RequestedScopes);
+
                 tokenRequest = new TokenCreationRequest
                 {
                     Subject = request.AuthorizationCode.Subject,
-                    Client = request.AuthorizationCode.Client,
-                    Scopes = request.AuthorizationCode.RequestedScopes,
+                    Client = client,
+                    Scopes = scopes,
                     ValidatedRequest = request
                 };
             }

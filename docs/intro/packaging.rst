@@ -16,6 +16,20 @@ Access token validation middleware
 
 ASP.NET Core middleware for validating tokens in APIs. Provides an easy way to validate access tokens (both JWT and reference) and enforce scope requirements.
 
+ASP.NET Core Identity
+^^^^^^^^^^^^^^^^^^^^^
+`nuget <https://www.nuget.org/packages/IdentityServer4.AspNetIdentity>`_ | `github <https://github.com/IdentityServer/IdentityServer4.AspNetIdentity>`_
+
+ASP.NET Core Identity integration package for IdentityServer. 
+This package provides a simple configuration API to use the ASP.NET Identity managament library for your IdentityServer users.
+
+EntityFramework Core
+^^^^^^^^^^^^^^^^^^^^
+`nuget <https://www.nuget.org/packages/IdentityServer4.EntityFramework>`_ | `github <https://github.com/IdentityServer/IdentityServer4.EntityFramework>`_
+
+EntityFramework Core storage implementation for IdentityServer. 
+This package provides an EntityFramework implementation for the configuration and operational stores in IdentityServer.
+
 Dev builds
 ^^^^^^^^^^
 In addition we publish dev/interim builds to MyGet.

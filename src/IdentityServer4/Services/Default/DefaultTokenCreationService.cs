@@ -20,11 +20,11 @@ namespace IdentityServer4.Services.Default
     /// </summary>
     public class DefaultTokenCreationService : ITokenCreationService
     {
-        private readonly ISigningCredentialStore _credentialStore;
+        private readonly IKeyMaterialService _keys;
 
-        public DefaultTokenCreationService(ISigningCredentialStore credentialStore)
+        public DefaultTokenCreationService(IKeyMaterialService keys)
         {
-            _credentialStore = credentialStore;
+            _keys = keys;
         }
 
         /// <summary>
@@ -50,7 +50,7 @@ namespace IdentityServer4.Services.Default
         /// <returns>The JWT header</returns>
         protected virtual async Task<JwtHeader> CreateHeaderAsync(Token token)
         {
-            var credential = await _credentialStore.GetSigningCredentialsAsync();
+            var credential = await _keys.GetSigningCredentialsAsync();
 
             if (credential == null)
             {
@@ -84,15 +84,27 @@ namespace IdentityServer4.Services.Default
                 DateTimeHelper.UtcNow.AddSeconds(token.Lifetime));
 
             var amrClaims = token.Claims.Where(x => x.Type == JwtClaimTypes.AuthenticationMethod);
-            var jsonClaims = token.Claims.Where(x => x.ValueType == Constants.ClaimValueTypes.Json);
-            var normalClaims = token.Claims.Except(amrClaims).Except(jsonClaims);
+            var scopeClaims = token.Claims.Where(x => x.Type == JwtClaimTypes.Scope);
+            var jsonClaims = token.Claims.Where(x => x.ValueType == IdentityServerConstants.ClaimValueTypes.Json);
+
+            var normalClaims = token.Claims
+                .Except(amrClaims)
+                .Except(jsonClaims)
+                .Except(scopeClaims);
 
             payload.AddClaims(normalClaims);
 
-            // deal with amr
-            var amrValues = amrClaims.Select(x => x.Value).Distinct().ToArray();
-            if (amrValues.Any())
+            // scope claims
+            if (!scopeClaims.IsNullOrEmpty())
             {
+                var scopeValues = scopeClaims.Select(x => x.Value).ToArray();
+                payload.Add(JwtClaimTypes.Scope, scopeValues);
+            }
+            
+            // amr claims
+            if (!amrClaims.IsNullOrEmpty())
+            {
+                var amrValues = amrClaims.Select(x => x.Value).Distinct().ToArray();
                 payload.Add(JwtClaimTypes.AuthenticationMethod, amrValues);
             }
 

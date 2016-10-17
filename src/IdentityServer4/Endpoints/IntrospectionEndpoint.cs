@@ -1,16 +1,17 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using System;
 using System.Threading.Tasks;
-using Microsoft.AspNet.Http;
 using IdentityServer4.Validation;
 using IdentityServer4.ResponseHandling;
 using IdentityServer4.Services;
 using Microsoft.Extensions.Logging;
-using IdentityServer4.Extensions;
 using IdentityServer4.Hosting;
 using IdentityServer4.Endpoints.Results;
+using Microsoft.AspNetCore.Http;
+using IdentityServer4.Events;
 
 namespace IdentityServer4.Endpoints
 {
@@ -31,12 +32,12 @@ namespace IdentityServer4.Endpoints
             _logger = logger;
         }
 
-        public async Task<IEndpointResult> ProcessAsync(IdentityServerContext context)
+        public async Task<IEndpointResult> ProcessAsync(HttpContext context)
         {
             _logger.LogTrace("Processing introspection request.");
 
             // validate HTTP
-            if (context.HttpContext.Request.Method != "POST")
+            if (context.Request.Method != "POST")
             {
                 _logger.LogWarning("Introspection endpoint only supports POST requests");
                 return new StatusCodeResult(405);
@@ -45,18 +46,18 @@ namespace IdentityServer4.Endpoints
             return await ProcessIntrospectionRequestAsync(context);
         }
 
-        private async Task<IEndpointResult> ProcessIntrospectionRequestAsync(IdentityServerContext context)
+        private async Task<IEndpointResult> ProcessIntrospectionRequestAsync(HttpContext context)
         {
             _logger.LogDebug("Starting introspection request.");
 
-            var scopeResult = await _scopeSecretValidator.ValidateAsync(context.HttpContext);
+            var scopeResult = await _scopeSecretValidator.ValidateAsync(context);
             if (scopeResult.Scope == null)
             {
                 _logger.LogError("Scope unauthorized to call introspection endpoint. aborting.");
                 return new StatusCodeResult(401);
             }
 
-            var parameters = context.HttpContext.Request.Form.AsNameValueCollection();
+            var parameters = context.Request.Form.AsNameValueCollection();
 
             var validationResult = await _requestValidator.ValidateAsync(parameters, scopeResult.Scope);
             var response = await _generator.ProcessAsync(validationResult, scopeResult.Scope);
@@ -71,8 +72,6 @@ namespace IdentityServer4.Endpoints
             {
                 if (validationResult.FailureReason == IntrospectionRequestValidationFailureReason.MissingToken)
                 {
-                    _logger.LogError("Missing token");
-
                     await RaiseFailureEventAsync(validationResult.ErrorDescription, validationResult.Token, scopeResult.Scope.Name);
                     //todo return BadRequest("missing_token");
                     return new StatusCodeResult(400);
@@ -91,11 +90,14 @@ namespace IdentityServer4.Endpoints
                 }
             }
 
+            _logger.LogError("Invalid token introspection outcome");
             throw new InvalidOperationException("Invalid token introspection outcome");
         }
 
         private async Task RaiseSuccessEventAsync(string token, string tokenStatus, string scopeName)
         {
+            _logger.LogInformation("Success token introspection. Token status: {tokenStatus}, for scope name: {scopeName}", tokenStatus, scopeName);
+
             await _events.RaiseSuccessfulIntrospectionEndpointEventAsync(
                 token,
                 tokenStatus,
@@ -104,6 +106,8 @@ namespace IdentityServer4.Endpoints
 
         private async Task RaiseFailureEventAsync(string error, string token, string scopeName)
         {
+            _logger.LogError("Failed token introspection: {error}, for scope name: {scopeName}", error, scopeName);
+
             await _events.RaiseFailureIntrospectionEndpointEventAsync(
                 error, token, scopeName);
         }

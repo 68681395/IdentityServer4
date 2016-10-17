@@ -1,17 +1,19 @@
-﻿using Host.Configuration;
-using Host.Extensions;
+﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
+// Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
+
+
+using Host.Configuration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
-using System.IO;
-using System.Security.Cryptography.X509Certificates;
 using Serilog.Events;
-using IdentityServer4.Configuration;
-using System.Collections.Generic;
-using IdentityServer4.Services.InMemory;
+using Microsoft.IdentityModel.Tokens;
+using System.Linq;
+using IdentityServer4;
 using IdentityServer4.Validation;
+using Serilog;
 
 namespace Host
 {
@@ -26,9 +28,18 @@ namespace Host
 
         public void ConfigureServices(IServiceCollection services)
         {
-            var cert = new X509Certificate2(Path.Combine(_environment.ContentRootPath, "idsrv3test.pfx"), "idsrv3test");
+            services.Configure<IISOptions>(options=>
+            {
+                const string windowsAuthType = "Negotiate";
+                var windows = options.AuthenticationDescriptions
+                    .FirstOrDefault(x => x.AuthenticationScheme == windowsAuthType);
+                if (windows != null)
+                {
+                    windows.DisplayName = "Windows";
+                }
+            });
 
-            var builder = services.AddIdentityServer(options =>
+            var builder = services.AddDeveloperIdentityServer(options =>
             {
                 //options.EventsOptions = new EventsOptions
                 //{
@@ -38,30 +49,18 @@ namespace Host
                 //    RaiseSuccessEvents = true
                 //};
 
-                options.UserInteractionOptions.LoginUrl = "/ui/login";
-                options.UserInteractionOptions.LogoutUrl = "/ui/logout";
-                options.UserInteractionOptions.ConsentUrl = "/ui/consent";
-                options.UserInteractionOptions.ErrorUrl = "/ui/error";
+                options.AuthenticationOptions.FederatedSignOutPaths.Add("/signout-oidc");
             })
-                .AddInMemoryClients(Clients.Get())
-                .AddInMemoryScopes(Scopes.Get())
-                //.AddInMemoryUsers(Users.Get())
-                //.SetTemporarySigningCredential();
-                .SetSigningCredential(cert);
+            .AddInMemoryClients(Clients.Get())
+            .AddInMemoryScopes(Scopes.Get())
+            .AddInMemoryUsers(Users.Get());
+            
+            builder.AddExtensionGrantValidator<Extensions.ExtensionGrantValidator>();
 
-            services.AddSingleton<List<InMemoryUser>>(Users.Get());
-            services.AddTransient<UI.Login.LoginService>();
-            services.AddTransient<IResourceOwnerPasswordValidator, InMemoryResourceOwnerPasswordValidator>();
+            builder.AddSecretParser<ClientAssertionSecretParser>();
+            builder.AddSecretValidator<PrivateKeyJwtSecretValidator>();
 
-            builder.AddExtensionGrantValidator<Host.Extensions.ExtensionGrantValidator>();
-
-            // for the UI
-            services
-                .AddMvc()
-                .AddRazorOptions(razor =>
-                {
-                    razor.ViewLocationExpanders.Add(new UI.CustomViewLocationExpander());
-                });
+            services.AddMvc();
         }
 
         public void Configure(IApplicationBuilder app, ILoggerFactory loggerFactory)
@@ -84,23 +83,26 @@ namespace Host
                 level == LogLevel.Error ||
                 level == LogLevel.Critical;
 
-            loggerFactory.AddConsole(filter);
-            loggerFactory.AddDebug(filter);
+            //loggerFactory.AddConsole(filter);
+            //loggerFactory.AddDebug(filter);
 
-            //var serilog = new LoggerConfiguration()
-            //    .MinimumLevel.Verbose()
-            //    .Enrich.FromLogContext()
-            //    .Filter.ByIncludingOnly(serilogFilter)
-            //    .WriteTo.LiterateConsole()
-            //    .CreateLogger();
+            var serilog = new LoggerConfiguration()
+                .MinimumLevel.Verbose()
+                .Enrich.FromLogContext()
+                .Filter.ByIncludingOnly(serilogFilter)
+                .WriteTo.LiterateConsole(outputTemplate: "[{Timestamp:HH:mm:ss} {Level}] {SourceContext}{NewLine}{Message}{NewLine}{Exception}{NewLine}")
+                .WriteTo.File(@"c:\logs\IdentityServer4.txt")
+                .CreateLogger();
 
-            //loggerFactory.AddSerilog(serilog);
+            loggerFactory.AddSerilog(serilog);
 
             app.UseDeveloperExceptionPage();
 
+            app.UseIdentityServer();
+
             app.UseCookieAuthentication(new CookieAuthenticationOptions
             {
-                AuthenticationScheme = "Temp",
+                AuthenticationScheme = IdentityServerConstants.ExternalCookieAuthenticationScheme,
                 AutomaticAuthenticate = false,
                 AutomaticChallenge = false
             });
@@ -108,12 +110,26 @@ namespace Host
             app.UseGoogleAuthentication(new GoogleOptions
             {
                 AuthenticationScheme = "Google",
-                SignInScheme = "Temp",
+                SignInScheme = IdentityServerConstants.ExternalCookieAuthenticationScheme,
                 ClientId = "998042782978-s07498t8i8jas7npj4crve1skpromf37.apps.googleusercontent.com",
-                ClientSecret = "HsnwJri_53zn7VcO1Fm7THBb"
+                ClientSecret = "HsnwJri_53zn7VcO1Fm7THBb",
             });
 
-            app.UseIdentityServer();
+            app.UseOpenIdConnectAuthentication(new OpenIdConnectOptions
+            {
+                SignInScheme = IdentityServerConstants.ExternalCookieAuthenticationScheme,
+                SignOutScheme = IdentityServerConstants.SignoutScheme,
+                DisplayName = "IdentityServer3",
+                Authority = "https://demo.identityserver.io/",
+                ClientId = "implicit",
+                ResponseType = "id_token",
+                Scope = { "openid profile" },
+                TokenValidationParameters = new TokenValidationParameters
+                {
+                    NameClaimType = "name",
+                    RoleClaimType = "role"
+                }
+            });
 
             app.UseStaticFiles();
             app.UseMvcWithDefaultRoute();

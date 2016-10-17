@@ -1,7 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
-using IdentityServer4.Extensions;
+
 using IdentityServer4.Validation;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -88,15 +88,9 @@ namespace IdentityServer4.Models
         /// <value>
         /// The parameters.
         /// </value>
-        public NameValueCollection Parameters { get; private set; }
+        public NameValueCollection Parameters { get; }
 
-        internal string Nonce
-        {
-            get
-            {
-                return Parameters[IdentityModel.OidcConstants.AuthorizeRequest.Nonce];
-            }
-        }
+        internal string Nonce => Parameters[IdentityModel.OidcConstants.AuthorizeRequest.Nonce];
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AuthorizationRequest"/> class.

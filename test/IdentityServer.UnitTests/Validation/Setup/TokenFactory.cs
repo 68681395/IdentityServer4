@@ -1,13 +1,15 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityModel;
 using IdentityServer4.Models;
+using IdentityServer4.UnitTests.Common;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 
-namespace IdentityServer4.Tests.Validation
+namespace IdentityServer4.UnitTests.Validation
 {
     static class TokenFactory
     {
@@ -27,7 +29,8 @@ namespace IdentityServer4.Tests.Validation
                 Issuer = "https://idsvr.com",
                 Lifetime = lifetime,
                 Claims = claims,
-                Client = client
+                ClientId = client.ClientId,
+                AccessTokenType = client.AccessTokenType
             };
 
             return token;
@@ -54,7 +57,8 @@ namespace IdentityServer4.Tests.Validation
                 Issuer = "https://idsvr.com",
                 Lifetime = lifetime,
                 Claims = claims,
-                Client = client
+                ClientId = client.ClientId,
+                AccessTokenType = client.AccessTokenType
             };
 
             return token;
@@ -72,7 +76,7 @@ namespace IdentityServer4.Tests.Validation
             var token = new Token(OidcConstants.TokenTypes.IdentityToken)
             {
                 Audience = clientId,
-                Client = clients.FindClientByIdAsync(clientId).Result,
+                ClientId = clientId,
                 Issuer = "https://idsvr.com",
                 Lifetime = 600,
                 Claims = claims
@@ -98,7 +102,7 @@ namespace IdentityServer4.Tests.Validation
             var token = new Token(OidcConstants.TokenTypes.IdentityToken)
             {
                 Audience = clientId,
-                Client = clients.FindClientByIdAsync(clientId).Result,
+                ClientId = clientId,
                 Issuer = "https://idsvr.com",
                 Lifetime = 600,
                 Claims = claims

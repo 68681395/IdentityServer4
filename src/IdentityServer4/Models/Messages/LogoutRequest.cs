@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityModel;
 using IdentityServer4.Extensions;
 using IdentityServer4.Validation;
@@ -26,11 +27,12 @@ namespace IdentityServer4.Models
                     PostLogoutRedirectUri = request.PostLogOutUri;
                     if (request.State != null)
                     {
-                        PostLogoutRedirectUri = PostLogoutRedirectUri.AddQueryString(OidcConstants.EndSessionRequest.State + "=" + request.State);
+                        PostLogoutRedirectUri = PostLogoutRedirectUri.AddQueryString(OidcConstants.EndSessionRequest.State, request.State);
                     }
                 }
             }
         }
+
         public LogoutMessage(LogoutMessage message)
         {
             ClientId = message?.ClientId;
@@ -72,5 +74,7 @@ namespace IdentityServer4.Models
         /// The sign out i frame URL.
         /// </value>
         public string SignOutIFrameUrl { get; set; }
+
+        public bool IsAuthenticatedLogout => ClientId.IsPresent();
     }
 }

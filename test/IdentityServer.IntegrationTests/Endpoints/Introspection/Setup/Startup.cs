@@ -6,20 +6,15 @@ using IdentityServer4.Services.InMemory;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.PlatformAbstractions;
 using System.Collections.Generic;
-using System.IO;
-using System.Security.Cryptography.X509Certificates;
 
-namespace IdentityServer4.Tests.Endpoints.Introspection
+namespace IdentityServer4.IntegrationTests.Endpoints.Introspection
 {
     public class Startup
     {
         public void ConfigureServices(IServiceCollection services)
         {
-            var cert = new X509Certificate2(Path.Combine(PlatformServices.Default.Application.ApplicationBasePath, "idsvrtest.pfx"), "idsrv3test");
-
-            var builder = services.AddIdentityServer(options =>
+            var builder = services.AddDeveloperIdentityServer(options =>
             {
                 options.IssuerUri = "https://idsvr4";
                 options.Endpoints.EnableAuthorizeEndpoint = false;
@@ -28,7 +23,6 @@ namespace IdentityServer4.Tests.Endpoints.Introspection
             builder.AddInMemoryClients(Clients.Get());
             builder.AddInMemoryScopes(Scopes.Get());
             builder.AddInMemoryUsers(new List<InMemoryUser>());
-            builder.SetSigningCredential(cert);
         }
 
         public void Configure(IApplicationBuilder app, ILoggerFactory loggerFactory)

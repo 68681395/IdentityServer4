@@ -1,18 +1,19 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using FluentAssertions;
 using IdentityModel;
 using IdentityServer4.Configuration;
 using IdentityServer4.Models;
 using IdentityServer4.ResponseHandling;
+using IdentityServer4.UnitTests.Common;
 using IdentityServer4.Validation;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using UnitTests.Common;
 using Xunit;
 
-namespace IdentityServer4.Tests.ResponseHandling
+namespace IdentityServer4.UnitTests.ResponseHandling
 {
     public class AuthorizeInteractionResponseGeneratorTests_Login
     {
@@ -26,8 +27,7 @@ namespace IdentityServer4.Tests.ResponseHandling
                 TestLogger.Create<AuthorizeInteractionResponseGenerator>(),
                 _options,
                 _mockConsentService,
-                new TestProfileService(),
-                new TestLocalizationService());
+                new TestProfileService());
         }
 
         [Fact]
@@ -138,40 +138,16 @@ namespace IdentityServer4.Tests.ResponseHandling
         }
 
         [Fact]
-        public async Task Authenticated_User_with_local_Idp_must_SignIn_when_global_options_does_not_allow_local_logins()
+        public async Task locally_authenticated_user_but_client_does_not_allow_local_should_sign_in()
         {
-            _options.AuthenticationOptions.EnableLocalLogin = false;
-
             var request = new ValidatedAuthorizeRequest
             {
                 ClientId = "foo",
-                Subject = IdentityServerPrincipal.Create("123", "dom"),
-                Client = new Client
+                Client = new Client()
                 {
-                    ClientId = "foo",
-                    EnableLocalLogin = true
+                    EnableLocalLogin = false,
                 },
-            };
-
-            var result = await _subject.ProcessLoginAsync(request);
-
-            result.IsLogin.Should().BeTrue();
-        }
-
-        [Fact]
-        public async Task Authenticated_User_with_local_Idp_must_SignIn_when_client_options_does_not_allow_local_logins()
-        {
-            _options.AuthenticationOptions.EnableLocalLogin = true;
-
-            var request = new ValidatedAuthorizeRequest
-            {
-                ClientId = "foo",
-                Subject = IdentityServerPrincipal.Create("123", "dom"),
-                Client = new Client
-                {
-                    ClientId = "foo",
-                    EnableLocalLogin = false
-                }
+                Subject = IdentityServerPrincipal.Create("123", "dom")
             };
 
             var result = await _subject.ProcessLoginAsync(request);

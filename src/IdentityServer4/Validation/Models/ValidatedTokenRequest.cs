@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityServer4.Models;
 using System.Collections.Generic;
 
@@ -43,14 +44,6 @@ namespace IdentityServer4.Validation
         /// </value>
         public string UserName { get; set; }
         
-        /// <summary>
-        /// Gets or sets the sign in message.
-        /// </summary>
-        /// <value>
-        /// The sign in message.
-        /// </value>
-        public AuthorizationRequest SignInMessage { get; set; }
-
         /// <summary>
         /// Gets or sets the refresh token.
         /// </summary>

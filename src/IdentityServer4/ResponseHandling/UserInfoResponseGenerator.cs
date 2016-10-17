@@ -1,11 +1,14 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityModel;
 using IdentityServer4.Extensions;
 using IdentityServer4.Models;
 using IdentityServer4.Services;
+using IdentityServer4.Stores;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
@@ -37,41 +40,55 @@ namespace IdentityServer4.ResponseHandling
             IEnumerable<Claim> profileClaims;
             if (requestedClaimTypes.IncludeAllClaims)
             {
-                _logger.LogInformation("Requested claim types: all");
+                _logger.LogDebug("Requested claim types: all");
 
                 var context = new ProfileDataRequestContext(
                     subject, 
-                    client, 
-                    Constants.ProfileDataCallers.UserInfoEndpoint);
+                    client,
+                    IdentityServerConstants.ProfileDataCallers.UserInfoEndpoint);
 
                 await _profile.GetProfileDataAsync(context);
                 profileClaims = context.IssuedClaims;
             }
             else
             {
-                _logger.LogInformation("Requested claim types: {types}", requestedClaimTypes.ClaimTypes.ToSpaceSeparatedString());
+                _logger.LogDebug("Requested claim types: {claimTypes}", requestedClaimTypes.ClaimTypes.ToSpaceSeparatedString());
 
                 var context = new ProfileDataRequestContext(
                     subject,
                     client,
-                    Constants.ProfileDataCallers.UserInfoEndpoint,
+                    IdentityServerConstants.ProfileDataCallers.UserInfoEndpoint,
                     requestedClaimTypes.ClaimTypes);
 
                 await _profile.GetProfileDataAsync(context);
                 profileClaims = context.IssuedClaims;
             }
-            
-            if (profileClaims != null)
-            {
-                profileData = profileClaims.ToClaimsDictionary();
-                _logger.LogInformation("Profile service returned to the following claim types: {types}", profileClaims.Select(c => c.Type).ToSpaceSeparatedString());
-            }
-            else
+
+            List<Claim> results = new List<Claim>();
+
+            if (profileClaims == null)
             {
                 _logger.LogInformation("Profile service returned no claims (null)");
             }
+            else
+            {
+                results.AddRange(profileClaims);
+                _logger.LogInformation("Profile service returned to the following claim types: {types}", profileClaims.Select(c => c.Type).ToSpaceSeparatedString());
+            }
 
-            return profileData;
+            // TODO: unit tests
+            var subClaim = results.SingleOrDefault(x => x.Type == JwtClaimTypes.Subject);
+            if (subClaim == null)
+            {
+                results.Add(new Claim(JwtClaimTypes.Subject, subject.GetSubjectId()));
+            }
+            else if (subClaim.Value != subject.GetSubjectId())
+            {
+                _logger.LogError("Profile service returned incorrect subject value: {sub}", subClaim);
+                throw new InvalidOperationException("Profile service returned incorrect subject value");
+            }
+
+            return results.ToClaimsDictionary();
         }
 
         public async Task<RequestedClaimTypes> GetRequestedClaimTypesAsync(IEnumerable<string> scopes)
@@ -82,9 +99,9 @@ namespace IdentityServer4.ResponseHandling
             }
 
             var scopeString = string.Join(" ", scopes);
-            _logger.LogInformation("Scopes in access token: {scopes}", scopeString);
+            _logger.LogDebug("Scopes in access token: {scopes}", scopeString);
 
-            var scopeDetails = await _scopes.FindScopesAsync(scopes);
+            var scopeDetails = await _scopes.FindEnabledScopesAsync(scopes);
             var scopeClaims = new List<string>();
 
             foreach (var scope in scopes)

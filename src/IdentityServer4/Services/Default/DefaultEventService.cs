@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityServer4.Events;
 using IdentityServer4.Logging;
 using Microsoft.Extensions.Logging;
@@ -34,7 +35,7 @@ namespace IdentityServer4.Services.Default
         /// <exception cref="System.ArgumentNullException">evt</exception>
         public virtual Task RaiseAsync<T>(Event<T> evt)
         {
-            if (evt == null) throw new ArgumentNullException("evt");
+            if (evt == null) throw new ArgumentNullException(nameof(evt));
 
             if (_helper.CanRaiseEvent(evt))
             {

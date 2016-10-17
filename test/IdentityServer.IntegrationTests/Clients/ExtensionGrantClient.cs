@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using FluentAssertions;
 using IdentityModel;
 using IdentityModel.Client;
@@ -10,12 +11,13 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace IdentityServer4.Tests.Clients
+namespace IdentityServer4.IntegrationTests.Clients
 {
     public class ExtensionGrantClient
     {
@@ -50,7 +52,8 @@ namespace IdentityServer4.Tests.Clients
 
             var response = await client.RequestCustomGrantAsync("custom", "api1", customParameters);
 
-            response.IsError.Should().Be(false);
+            response.IsError.Should().BeFalse();
+            response.HttpStatusCode.Should().Be(HttpStatusCode.OK);
             response.ExpiresIn.Should().Be(3600);
             response.TokenType.Should().Be("Bearer");
             response.IdentityToken.Should().BeNull();
@@ -62,13 +65,57 @@ namespace IdentityServer4.Tests.Clients
             payload.Should().Contain("iss", "https://idsvr4");
             payload.Should().Contain("aud", "https://idsvr4/resources");
             payload.Should().Contain("client_id", "client.custom");
-            payload.Should().Contain("scope", "api1");
+            payload.Should().Contain("sub", "818727");
+            payload.Should().Contain("idp", "local");
+
+            var scopes = payload["scope"] as JArray;
+            scopes.First().ToString().Should().Be("api1");
+
+            var amr = payload["amr"] as JArray;
+            amr.Count().Should().Be(1);
+            amr.First().ToString().Should().Be("custom");
+        }
+
+        [Fact]
+        public async Task Valid_Client_with_default_Scopes()
+        {
+            var client = new TokenClient(
+                TokenEndpoint,
+                "client.custom",
+                "secret",
+                innerHttpMessageHandler: _handler);
+
+            var customParameters = new Dictionary<string, string>
+                {
+                    { "custom_credential", "custom credential"}
+                };
+
+            var response = await client.RequestCustomGrantAsync("custom", extra: customParameters);
+
+            response.IsError.Should().BeFalse();
+            response.HttpStatusCode.Should().Be(HttpStatusCode.OK);
+            response.ExpiresIn.Should().Be(3600);
+            response.TokenType.Should().Be("Bearer");
+            response.IdentityToken.Should().BeNull();
+            response.RefreshToken.Should().BeNull();
+
+            var payload = GetPayload(response);
+
+            payload.Count().Should().Be(10);
+            payload.Should().Contain("iss", "https://idsvr4");
+            payload.Should().Contain("aud", "https://idsvr4/resources");
+            payload.Should().Contain("client_id", "client.custom");
             payload.Should().Contain("sub", "818727");
             payload.Should().Contain("idp", "local");
 
             var amr = payload["amr"] as JArray;
             amr.Count().Should().Be(1);
             amr.First().ToString().Should().Be("custom");
+
+            var scopes = payload["scope"] as JArray;
+            scopes.Count().Should().Be(2);
+            scopes.First().ToString().Should().Be("api1");
+            scopes.Skip(1).First().ToString().Should().Be("api2");
         }
 
         [Fact]
@@ -83,7 +130,9 @@ namespace IdentityServer4.Tests.Clients
             var response = await client.RequestCustomGrantAsync("custom", "api1");
 
             response.IsError.Should().Be(true);
-            response.Error.Should().Be("invalid_custom_credential");
+            response.ErrorType.Should().Be(ResponseErrorType.Protocol);
+            response.Error.Should().Be(OidcConstants.TokenErrors.InvalidGrant);
+            response.ErrorDescription.Should().Be("invalid_custom_credential");
         }
 
         [Fact]
@@ -103,6 +152,8 @@ namespace IdentityServer4.Tests.Clients
             var response = await client.RequestCustomGrantAsync("invalid", "api1", customParameters);
 
             response.IsError.Should().Be(true);
+            response.ErrorType.Should().Be(ResponseErrorType.Protocol);
+            response.HttpStatusCode.Should().Be(HttpStatusCode.BadRequest);
             response.Error.Should().Be("unsupported_grant_type");
         }
 
@@ -123,6 +174,8 @@ namespace IdentityServer4.Tests.Clients
             var response = await client.RequestCustomGrantAsync("custom2", "api1", customParameters);
 
             response.IsError.Should().Be(true);
+            response.ErrorType.Should().Be(ResponseErrorType.Protocol);
+            response.HttpStatusCode.Should().Be(HttpStatusCode.BadRequest);
             response.Error.Should().Be("unsupported_grant_type");
         }
 

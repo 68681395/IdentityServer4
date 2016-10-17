@@ -1,9 +1,9 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityModel;
 using IdentityServer4.Extensions;
-using IdentityServer4.Hosting;
 using IdentityServer4.Logging;
 using IdentityServer4.Models;
 using IdentityServer4.Services;
@@ -15,25 +15,30 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
+using IdentityServer4.Stores;
+using IdentityServer4.Configuration;
+using Microsoft.AspNetCore.Http;
 
 namespace IdentityServer4.Validation
 {
     public class TokenValidator : ITokenValidator
     {
         private readonly ILogger _logger;
-        private readonly IdentityServerContext _context;
-        private readonly ITokenHandleStore _tokenHandles;
+        private readonly IdentityServerOptions _options;
+        private readonly IHttpContextAccessor _context;
+        private readonly IPersistedGrantService _grants;
         private readonly ICustomTokenValidator _customValidator;
         private readonly IClientStore _clients;
-        private readonly IEnumerable<IValidationKeysStore> _keys;
+        private readonly IKeyMaterialService _keys;
 
         private readonly TokenValidationLog _log;
         
-        public TokenValidator(IdentityServerContext context, IClientStore clients, ITokenHandleStore tokenHandles, ICustomTokenValidator customValidator, IEnumerable<IValidationKeysStore> keys, ILogger<TokenValidator> logger)
+        public TokenValidator(IdentityServerOptions options, IHttpContextAccessor context, IClientStore clients, IPersistedGrantService grants, ICustomTokenValidator customValidator, IKeyMaterialService keys, ILogger<TokenValidator> logger)
         {
+            _options = options;
             _context = context;
             _clients = clients;
-            _tokenHandles = tokenHandles;
+            _grants = grants;
             _customValidator = customValidator;
             _keys = keys;
             _logger = logger;
@@ -45,7 +50,7 @@ namespace IdentityServer4.Validation
         {
             _logger.LogDebug("Start identity token validation");
 
-            if (token.Length > _context.Options.InputLengthRestrictions.Jwt)
+            if (token.Length > _options.InputLengthRestrictions.Jwt)
             {
                 _logger.LogError("JWT too long");
                 return Invalid(OidcConstants.ProtectedResourceErrors.InvalidToken);
@@ -65,7 +70,7 @@ namespace IdentityServer4.Validation
             _log.ClientId = clientId;
             _log.ValidateLifetime = validateLifetime;
 
-            var client = await _clients.FindClientByIdAsync(clientId);
+            var client = await _clients.FindEnabledClientByIdAsync(clientId);
             if (client == null)
             {
                 _logger.LogError("Unknown or diabled client: {clientId}.", clientId);
@@ -75,7 +80,7 @@ namespace IdentityServer4.Validation
             _log.ClientName = client.ClientName;
             _logger.LogDebug("Client found: {clientId} / {clientName}", client.ClientId, client.ClientName);
 
-            var keys = await _keys.GetKeysAsync();
+            var keys = await _keys.GetValidationKeysAsync();
             var result = await ValidateJwtAsync(token, clientId, keys, validateLifetime);
 
             result.Client = client;
@@ -114,7 +119,7 @@ namespace IdentityServer4.Validation
 
             if (token.Contains("."))
             {
-                if (token.Length > _context.Options.InputLengthRestrictions.Jwt)
+                if (token.Length > _options.InputLengthRestrictions.Jwt)
                 {
                     _logger.LogError("JWT too long");
 
@@ -129,12 +134,12 @@ namespace IdentityServer4.Validation
                 _log.AccessTokenType = AccessTokenType.Jwt.ToString();
                 result = await ValidateJwtAsync(
                     token,
-                    string.Format(Constants.AccessTokenAudience, _context.GetIssuerUri().EnsureTrailingSlash()),
-                    await _keys.GetKeysAsync());
+                    string.Format(Constants.AccessTokenAudience, _context.HttpContext.GetIssuerUri().EnsureTrailingSlash()),
+                    await _keys.GetValidationKeysAsync());
             }
             else
             {
-                if (token.Length > _context.Options.InputLengthRestrictions.TokenHandle)
+                if (token.Length > _options.InputLengthRestrictions.TokenHandle)
                 {
                     _logger.LogError("token handle too long");
 
@@ -189,7 +194,7 @@ namespace IdentityServer4.Validation
 
             var parameters = new TokenValidationParameters
             {
-                ValidIssuer = _context.GetIssuerUri(),
+                ValidIssuer = _context.HttpContext.GetIssuerUri(),
                 IssuerSigningKeys = validationKeys,
                 ValidateLifetime = validateLifetime,
                 ValidAudience = audience
@@ -212,7 +217,7 @@ namespace IdentityServer4.Validation
                 var clientId = id.FindFirst(JwtClaimTypes.ClientId);
                 if (clientId != null)
                 {
-                    client = await _clients.FindClientByIdAsync(clientId.Value);
+                    client = await _clients.FindEnabledClientByIdAsync(clientId.Value);
                     if (client == null)
                     {
                         throw new InvalidOperationException("Client does not exist anymore.");
@@ -238,7 +243,7 @@ namespace IdentityServer4.Validation
         private async Task<TokenValidationResult> ValidateReferenceAccessTokenAsync(string tokenHandle)
         {
             _log.TokenHandle = tokenHandle;
-            var token = await _tokenHandles.GetAsync(tokenHandle);
+            var token = await _grants.GetReferenceTokenAsync(tokenHandle);
 
             if (token == null)
             {
@@ -246,27 +251,41 @@ namespace IdentityServer4.Validation
                 return Invalid(OidcConstants.ProtectedResourceErrors.InvalidToken);
             }
 
-            if (token.Type != OidcConstants.TokenTypes.AccessToken)
-            {
-                LogError("Token handle does not resolve to an access token - but instead to: " + token.Type);
+            // TODO: review
+            //if (token.Type != OidcConstants.TokenTypes.AccessToken)
+            //{
+            //    LogError("Token handle does not resolve to an access token - but instead to: " + token.Type);
 
-                await _tokenHandles.RemoveAsync(tokenHandle);
-                return Invalid(OidcConstants.ProtectedResourceErrors.InvalidToken);
-            }
+            //    await _tokenHandles.RemoveAsync(tokenHandle);
+            //    return Invalid(OidcConstants.ProtectedResourceErrors.InvalidToken);
+            //}
 
-            if (DateTimeOffsetHelper.UtcNow >= token.CreationTime.AddSeconds(token.Lifetime))
+            if (DateTimeHelper.UtcNow >= token.CreationTime.AddSeconds(token.Lifetime))
             {
                 LogError("Token expired.");
 
-                await _tokenHandles.RemoveAsync(tokenHandle);
+                await _grants.RemoveReferenceTokenAsync(tokenHandle);
                 return Invalid(OidcConstants.ProtectedResourceErrors.ExpiredToken);
+            }
+
+            // load the client that is defined in the token
+            Client client = null;
+            if (token.ClientId != null)
+            {
+                client = await _clients.FindEnabledClientByIdAsync(token.ClientId);
+            }
+
+            if (client == null)
+            {
+                LogError($"Client deleted or disabled: {token.ClientId}");
+                return Invalid(OidcConstants.ProtectedResourceErrors.InvalidToken);
             }
 
             return new TokenValidationResult
             {
                 IsError = false,
 
-                Client = token.Client,
+                Client = client,
                 Claims = ReferenceTokenToClaims(token),
                 ReferenceToken = token,
                 ReferenceTokenId = tokenHandle
@@ -279,8 +298,8 @@ namespace IdentityServer4.Validation
             {
                 new Claim(JwtClaimTypes.Audience, token.Audience),
                 new Claim(JwtClaimTypes.Issuer, token.Issuer),
-                new Claim(JwtClaimTypes.NotBefore, token.CreationTime.ToEpochTime().ToString()),
-                new Claim(JwtClaimTypes.Expiration, token.CreationTime.AddSeconds(token.Lifetime).ToEpochTime().ToString())
+                new Claim(JwtClaimTypes.NotBefore, token.CreationTime.ToEpochTime().ToString(), ClaimValueTypes.Integer),
+                new Claim(JwtClaimTypes.Expiration, token.CreationTime.AddSeconds(token.Lifetime).ToEpochTime().ToString(), ClaimValueTypes.Integer)
             };
 
             claims.AddRange(token.Claims);
@@ -320,7 +339,7 @@ namespace IdentityServer4.Validation
 
         private void LogSuccess()
         {
-            _logger.LogInformation("Token validation success\n{logMessage}", _log);
+            _logger.LogDebug("Token validation success\n{logMessage}", _log);
         }
     }
 }

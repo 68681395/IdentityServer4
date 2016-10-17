@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityModel;
 using IdentityServer4.Configuration;
 using IdentityServer4.Endpoints.Results;
@@ -8,6 +9,7 @@ using IdentityServer4.Extensions;
 using IdentityServer4.Hosting;
 using IdentityServer4.Models;
 using IdentityServer4.Services;
+using IdentityServer4.Stores;
 using IdentityServer4.Validation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -23,43 +25,43 @@ namespace IdentityServer4.Endpoints
 {
     public class DiscoveryEndpoint : IEndpoint
     {
-        private readonly IdentityServerContext _context;
-        private readonly ExtensionGrantValidator _extensionGrants;
-        private readonly IEnumerable<IValidationKeysStore> _keys;
-        private readonly ILogger _logger;
         private readonly IdentityServerOptions _options;
+        private readonly ExtensionGrantValidator _extensionGrants;
+        private readonly IKeyMaterialService _keys;
+        private readonly ILogger _logger;
         private readonly SecretParser _parsers;
+        private readonly IResourceOwnerPasswordValidator _resourceOwnerValidator;
         private readonly IScopeStore _scopes;
 
-        public DiscoveryEndpoint(IdentityServerOptions options, IdentityServerContext context, IScopeStore scopes, ILogger<DiscoveryEndpoint> logger, IEnumerable<IValidationKeysStore> keys, ExtensionGrantValidator extensionGrants, SecretParser parsers)
+        public DiscoveryEndpoint(IdentityServerOptions options, IScopeStore scopes, ILogger<DiscoveryEndpoint> logger, IKeyMaterialService keys, ExtensionGrantValidator extensionGrants, SecretParser parsers, IResourceOwnerPasswordValidator resourceOwnerValidator)
         {
             _options = options;
             _scopes = scopes;
             _logger = logger;
-            _context = context;
             _extensionGrants = extensionGrants;
             _parsers = parsers;
             _keys = keys;
+            _resourceOwnerValidator = resourceOwnerValidator;
         }
 
-        public Task<IEndpointResult> ProcessAsync(IdentityServerContext context)
+        public Task<IEndpointResult> ProcessAsync(HttpContext context)
         {
             _logger.LogTrace("Processing discovery request.");
 
             // validate HTTP
-            if (context.HttpContext.Request.Method != "GET")
+            if (context.Request.Method != "GET")
             {
                 _logger.LogWarning("Discovery endpoint only supports GET requests");
                 return Task.FromResult<IEndpointResult>(new StatusCodeResult(HttpStatusCode.MethodNotAllowed));
             }
 
-            if (context.HttpContext.Request.Path.Value.EndsWith("/jwks"))
+            if (context.Request.Path.Value.EndsWith("/jwks"))
             {
-                return ExecuteJwksAsync(context.HttpContext);
+                return ExecuteJwksAsync(context);
             }
             else
             {
-                return ExecuteDiscoDocAsync(context.HttpContext);
+                return ExecuteDiscoDocAsync(context);
             }
         }
 
@@ -73,26 +75,27 @@ namespace IdentityServer4.Endpoints
                 return new StatusCodeResult(404);
             }
 
-            var baseUrl = _context.GetIdentityServerBaseUrl().EnsureTrailingSlash();
-            var allScopes = await _scopes.GetScopesAsync(publicOnly: true);
+            var baseUrl = context.GetIdentityServerBaseUrl().EnsureTrailingSlash();
+            var allScopes = await _scopes.GetEnabledScopesAsync(publicOnly: true);
             var showScopes = new List<Scope>();
 
             var document = new DiscoveryDocument
             {
-                issuer = _context.GetIssuerUri(),
+                issuer = context.GetIssuerUri(),
                 subject_types_supported = new[] { "public" },
                 id_token_signing_alg_values_supported = new[] { Constants.SigningAlgorithms.RSA_SHA_256 },
                 code_challenge_methods_supported = new[] { OidcConstants.CodeChallengeMethods.Plain, OidcConstants.CodeChallengeMethods.Sha256 }
             };
 
             // scopes
+            var theScopes = allScopes as Scope[] ?? allScopes.ToArray();
             if (_options.DiscoveryOptions.ShowIdentityScopes)
             {
-                showScopes.AddRange(allScopes.Where(s => s.Type == ScopeType.Identity));
+                showScopes.AddRange(theScopes.Where(s => s.Type == ScopeType.Identity));
             }
             if (_options.DiscoveryOptions.ShowResourceScopes)
             {
-                showScopes.AddRange(allScopes.Where(s => s.Type == ScopeType.Resource));
+                showScopes.AddRange(theScopes.Where(s => s.Type == ScopeType.Resource));
             }
 
             if (showScopes.Any())
@@ -104,7 +107,7 @@ namespace IdentityServer4.Endpoints
             if (_options.DiscoveryOptions.ShowClaims)
             {
                 var claims = new List<string>();
-                foreach (var s in allScopes)
+                foreach (var s in theScopes)
                 {
                     claims.AddRange(from c in s.Claims
                                     where s.Type == ScopeType.Identity
@@ -117,14 +120,19 @@ namespace IdentityServer4.Endpoints
             // grant types
             if (_options.DiscoveryOptions.ShowGrantTypes)
             {
-                var standardGrantTypes = Constants.SupportedGrantTypes.AsEnumerable();
-                
-                // TODO: find a better way to determine if password is support (e.g. by checking the type of IResourceOwnerPasswordValidator
-                //if (this._options.AuthenticationOptions.EnableLocalLogin == false)
-                //{
-                //    standardGrantTypes = standardGrantTypes.Where(type => type != OidcConstants.GrantTypes.Password);
-                //}
+                var standardGrantTypes = new List<string>
+                {
+                    OidcConstants.GrantTypes.AuthorizationCode,
+                    OidcConstants.GrantTypes.ClientCredentials,
+                    OidcConstants.GrantTypes.RefreshToken,
+                    OidcConstants.GrantTypes.Implicit
+                };
 
+                if (!(_resourceOwnerValidator is NotSupportedResouceOwnerPasswordValidator))
+                {
+                    standardGrantTypes.Add(OidcConstants.GrantTypes.Password);
+                }
+                
                 var showGrantTypes = new List<string>(standardGrantTypes);
 
                 if (_options.DiscoveryOptions.ShowExtensionGrantTypes)
@@ -156,11 +164,6 @@ namespace IdentityServer4.Endpoints
             // endpoints
             if (_options.DiscoveryOptions.ShowEndpoints)
             {
-                if (_options.Endpoints.EnableEndSessionEndpoint)
-                {
-                    document.http_logout_supported = true;
-                }
-
                 if (_options.Endpoints.EnableAuthorizeEndpoint)
                 {
                     document.authorization_endpoint = baseUrl + Constants.ProtocolRoutePaths.Authorize;
@@ -178,6 +181,8 @@ namespace IdentityServer4.Endpoints
 
                 if (_options.Endpoints.EnableEndSessionEndpoint)
                 {
+                    document.frontchannel_logout_session_supported = true;
+                    document.frontchannel_logout_supported = true;
                     document.end_session_endpoint = baseUrl + Constants.ProtocolRoutePaths.EndSession;
                 }
 
@@ -186,11 +191,10 @@ namespace IdentityServer4.Endpoints
                     document.check_session_iframe = baseUrl + Constants.ProtocolRoutePaths.CheckSession;
                 }
 
-                //TODO
-                //if (_options.Endpoints.EnableTokenRevocationEndpoint)
-                //{
-                //    document.revocation_endpoint = baseUrl + Constants.ProtocolRoutePaths.Revocation;
-                //}
+                if (_options.Endpoints.EnableTokenRevocationEndpoint)
+                {
+                    document.revocation_endpoint = baseUrl + Constants.ProtocolRoutePaths.Revocation;
+                }
 
                 if (_options.Endpoints.EnableIntrospectionEndpoint)
                 {
@@ -200,7 +204,7 @@ namespace IdentityServer4.Endpoints
 
             if (_options.DiscoveryOptions.ShowKeySet)
             {
-                if ((await _keys.GetKeysAsync()).Any())
+                if ((await _keys.GetValidationKeysAsync()).Any())
                 {
                     document.jwks_uri = baseUrl + Constants.ProtocolRoutePaths.DiscoveryWebKeys;
                 }
@@ -220,7 +224,7 @@ namespace IdentityServer4.Endpoints
             }
 
             var webKeys = new List<Models.JsonWebKey>();
-            foreach (var key in await _keys.GetKeysAsync())
+            foreach (var key in await _keys.GetValidationKeysAsync())
             {
                 // todo
                 //if (!(key is AsymmetricSecurityKey) &&
@@ -260,8 +264,7 @@ namespace IdentityServer4.Endpoints
                 var rsaKey = key as RsaSecurityKey;
                 if (rsaKey != null)
                 {
-                    var parameters = rsaKey.Rsa.ExportParameters(false);
-
+                    var parameters = rsaKey.Rsa?.ExportParameters(false) ?? rsaKey.Parameters;
                     var exponent = Base64Url.Encode(parameters.Exponent);
                     var modulus = Base64Url.Encode(parameters.Modulus);
 

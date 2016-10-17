@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityModel;
 using IdentityServer4.Models;
 using Microsoft.Extensions.Logging;
@@ -44,7 +45,7 @@ namespace IdentityServer4.Validation
             // invalid or unknown token
             if (tokenValidationResult.IsError)
             {
-                _logger.LogError("Token is invalid.");
+                _logger.LogDebug("Token is invalid.");
 
                 fail.IsActive = false;
                 fail.FailureReason = IntrospectionRequestValidationFailureReason.InvalidToken;
@@ -77,7 +78,7 @@ namespace IdentityServer4.Validation
                 Claims = tokenValidationResult.Claims
             };
 
-            _logger.LogInformation("Introspection request validation successful.");
+            _logger.LogDebug("Introspection request validation successful.");
             return success;
         }
     }

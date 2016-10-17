@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using System;
 using System.Linq;
 using System.Net;
@@ -8,7 +9,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace IdentityServer4.Tests.Common
+namespace IdentityServer4.IntegrationTests.Common
 {
     // thanks to Damian Hickey for this awesome sample
     // https://github.com/damianh/OwinHttpMessageHandler/blob/master/src/OwinHttpMessageHandler/OwinHttpMessageHandler.cs
@@ -55,6 +56,11 @@ namespace IdentityServer4.Tests.Common
             }
 
             return response;
+        }
+
+        internal Cookie GetCookie(string uri, string name)
+        {
+            return _cookieContainer.GetCookies(new Uri(uri)).Cast<Cookie>().Where(x => x.Name == name).FirstOrDefault();
         }
 
         internal void RemoveCookie(string uri, string name)

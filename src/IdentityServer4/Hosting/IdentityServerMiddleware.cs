@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using System;
@@ -19,21 +20,21 @@ namespace IdentityServer4.Hosting
             _logger = logger;
         }
 
-        public async Task Invoke(HttpContext context, IEndpointRouter router, IdentityServerContext idSvrContext)
+        public async Task Invoke(HttpContext context, IEndpointRouter router)
         {
             try
             {
                 var endpoint = router.Find(context);
                 if (endpoint != null)
                 {
-                    _logger.LogTrace("Invoking IdentityServer endpoint: {type}", endpoint.GetType().FullName);
+                    _logger.LogInformation("Invoking IdentityServer endpoint: {endpointType} for {url}", endpoint.GetType().FullName, context.Request.Path.ToString());
 
-                    var result = await endpoint.ProcessAsync(idSvrContext);
+                    var result = await endpoint.ProcessAsync(context);
 
                     if (result != null)
                     {
                         _logger.LogTrace("Invoking result: {type}", result.GetType().FullName);
-                        await result.ExecuteAsync(idSvrContext);
+                        await result.ExecuteAsync(context);
                     }
 
                     return;

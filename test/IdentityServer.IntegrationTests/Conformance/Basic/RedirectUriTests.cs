@@ -1,10 +1,9 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using FluentAssertions;
 using IdentityServer4.Models;
-using IdentityServer4.Services.InMemory;
-using IdentityServer4.Tests.Common;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -12,8 +11,10 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Xunit;
 using System.Net.Http;
+using IdentityServer4.IntegrationTests.Common;
+using IdentityServer4.Services.InMemory;
 
-namespace IdentityServer4.Tests.Conformance.Basic
+namespace IdentityServer4.IntegrationTests.Conformance.Basic
 {
     public class RedirectUriTests
     {
@@ -79,7 +80,7 @@ namespace IdentityServer4.Tests.Conformance.Basic
             var response = await _mockPipeline.BrowserClient.GetAsync(url);
 
             _mockPipeline.ErrorWasCalled.Should().BeTrue();
-            _mockPipeline.ErrorMessage.ErrorCode.Should().Be("unauthorized_client");
+            _mockPipeline.ErrorMessage.Error.Should().Be("unauthorized_client");
         }
 
         [Fact]
@@ -102,7 +103,7 @@ namespace IdentityServer4.Tests.Conformance.Basic
             var response = await _mockPipeline.BrowserClient.GetAsync(url);
 
             _mockPipeline.ErrorWasCalled.Should().BeTrue();
-            _mockPipeline.ErrorMessage.ErrorCode.Should().Be("invalid_request");
+            _mockPipeline.ErrorMessage.Error.Should().Be("invalid_request");
         }
 
         [Fact]
@@ -153,7 +154,7 @@ namespace IdentityServer4.Tests.Conformance.Basic
             var response = await _mockPipeline.BrowserClient.GetAsync(url);
 
             _mockPipeline.ErrorWasCalled.Should().BeTrue();
-            _mockPipeline.ErrorMessage.ErrorCode.Should().Be("unauthorized_client");
+            _mockPipeline.ErrorMessage.Error.Should().Be("unauthorized_client");
         }
     }
 }

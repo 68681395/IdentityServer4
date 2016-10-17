@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using System.Collections.Generic;
 using System.Security.Claims;
 
@@ -12,20 +13,20 @@ namespace IdentityServer4.Services.InMemory
     public class InMemoryUser
     {
         /// <summary>
+        /// Gets or sets a value indicating whether this <see cref="InMemoryUser"/> is enabled.
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if enabled; otherwise, <c>false</c>.
+        /// </value>
+        public bool Enabled { get; set; } = true;
+
+        /// <summary>
         /// Gets or sets the subject.
         /// </summary>
         /// <value>
         /// The subject.
         /// </value>
         public string Subject { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether this <see cref="InMemoryUser"/> is enabled.
-        /// </summary>
-        /// <value>
-        ///   <c>true</c> if enabled; otherwise, <c>false</c>.
-        /// </value>
-        public bool Enabled { get; set; }
 
         /// <summary>
         /// Gets or sets the username.
@@ -65,15 +66,6 @@ namespace IdentityServer4.Services.InMemory
         /// <value>
         /// The claims.
         /// </value>
-        public IEnumerable<Claim> Claims { get; set; }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="InMemoryUser"/> class.
-        /// </summary>
-        public InMemoryUser()
-        {
-            Enabled = true;
-            Claims = new List<Claim>();
-        }
+        public IEnumerable<Claim> Claims { get; set; } = new List<Claim>();
     }
 }

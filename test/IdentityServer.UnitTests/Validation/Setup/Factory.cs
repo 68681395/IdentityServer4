@@ -1,17 +1,19 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityServer4.Configuration;
 using IdentityServer4.Services;
 using IdentityServer4.Services.Default;
-using IdentityServer4.Services.InMemory;
 using IdentityServer4.Validation;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
-using IdentityServer4.Hosting;
-using UnitTests.Common;
+using IdentityServer4.Stores;
+using IdentityServer4.UnitTests.Common;
+using IdentityServer4.Stores.Serialization;
+using IdentityServer4.Stores.InMemory;
 
-namespace IdentityServer4.Tests.Validation
+namespace IdentityServer4.UnitTests.Validation
 {
     static class Factory
     {
@@ -28,12 +30,11 @@ namespace IdentityServer4.Tests.Validation
         public static TokenRequestValidator CreateTokenRequestValidator(
             IdentityServerOptions options = null,
             IScopeStore scopes = null,
-            IAuthorizationCodeStore authorizationCodeStore = null,
-            IRefreshTokenStore refreshTokens = null,
+            IPersistedGrantService grants = null,
             IResourceOwnerPasswordValidator resourceOwnerValidator = null,
             IProfileService profile = null,
             IEnumerable<IExtensionGrantValidator> extensionGrantValidators = null,
-            ICustomRequestValidator customRequestValidator = null,
+            ICustomTokenRequestValidator customRequestValidator = null,
             ScopeValidator scopeValidator = null)
         {
             if (options == null)
@@ -58,22 +59,22 @@ namespace IdentityServer4.Tests.Validation
 
             if (customRequestValidator == null)
             {
-                customRequestValidator = new DefaultCustomRequestValidator();
+                customRequestValidator = new DefaultCustomTokenRequestValidator();
             }
 
             ExtensionGrantValidator aggregateExtensionGrantValidator;
             if (extensionGrantValidators == null)
             {
-                aggregateExtensionGrantValidator = new ExtensionGrantValidator(new [] { new TestGrantValidator() }, TestLogger.Create<ExtensionGrantValidator>());
+                aggregateExtensionGrantValidator = new ExtensionGrantValidator(new[] { new TestGrantValidator() }, TestLogger.Create<ExtensionGrantValidator>());
             }
             else
             {
                 aggregateExtensionGrantValidator = new ExtensionGrantValidator(extensionGrantValidators, TestLogger.Create<ExtensionGrantValidator>());
             }
-                
-            if (refreshTokens == null)
+
+            if (grants == null)
             {
-                refreshTokens = new InMemoryRefreshTokenStore();
+                grants = CreateGrantService();
             }
 
             if (scopeValidator == null)
@@ -81,17 +82,14 @@ namespace IdentityServer4.Tests.Validation
                 scopeValidator = new ScopeValidator(scopes, new LoggerFactory().CreateLogger<ScopeValidator>());
             }
 
-            var idsvrContext = IdentityServerContextHelper.Create();
-
             return new TokenRequestValidator(
-                options, 
-                authorizationCodeStore, 
-                refreshTokens, 
-                resourceOwnerValidator, 
+                options,
+                grants,
+                resourceOwnerValidator,
                 profile,
-                aggregateExtensionGrantValidator, 
-                customRequestValidator, 
-                scopeValidator, 
+                aggregateExtensionGrantValidator,
+                customRequestValidator,
+                scopeValidator,
                 new TestEventService(),
                 TestLogger.Create<TokenRequestValidator>());
         }
@@ -99,7 +97,7 @@ namespace IdentityServer4.Tests.Validation
         internal static ITokenCreationService CreateDefaultTokenCreator()
         {
             return new DefaultTokenCreationService(
-                new InMemorySigningCredentialsStore(TestCert.LoadSigningCredentials()));
+                new DefaultKeyMaterialService(new IValidationKeysStore[] { }, new DefaultSigningCredentialsStore(TestCert.LoadSigningCredentials())));
         }
 
         public static AuthorizeRequestValidator CreateAuthorizeRequestValidator(
@@ -107,7 +105,7 @@ namespace IdentityServer4.Tests.Validation
             IScopeStore scopes = null,
             IClientStore clients = null,
             IProfileService profile = null,
-            ICustomRequestValidator customValidator = null,
+            ICustomAuthorizeRequestValidator customValidator = null,
             IRedirectUriValidator uriValidator = null,
             ScopeValidator scopeValidator = null)
         {
@@ -128,7 +126,7 @@ namespace IdentityServer4.Tests.Validation
 
             if (customValidator == null)
             {
-                customValidator = new DefaultCustomRequestValidator();
+                customValidator = new DefaultCustomAuthorizeRequestValidator();
             }
 
             if (uriValidator == null)
@@ -141,7 +139,7 @@ namespace IdentityServer4.Tests.Validation
                 scopeValidator = new ScopeValidator(scopes, new LoggerFactory().CreateLogger<ScopeValidator>());
             }
 
-            var sessionCookie = new SessionCookie(IdentityServerContextHelper.Create(null, options));
+            var sessionId = new MockSessionIdService();
 
             return new AuthorizeRequestValidator(
                 options,
@@ -149,36 +147,38 @@ namespace IdentityServer4.Tests.Validation
                 customValidator,
                 uriValidator,
                 scopeValidator,
-                sessionCookie,
+                sessionId,
                 TestLogger.Create<AuthorizeRequestValidator>());
         }
 
-        public static TokenValidator CreateTokenValidator(ITokenHandleStore tokenStore = null, IProfileService profile = null)
+        public static TokenValidator CreateTokenValidator(IPersistedGrantService grants = null, IProfileService profile = null)
         {
             if (profile == null)
             {
                 profile = new TestProfileService();
             }
 
-            if (tokenStore == null)
+            if (grants == null)
             {
-                tokenStore = new InMemoryTokenHandleStore();
+                grants = CreateGrantService();
             }
 
             var clients = CreateClientStore();
-            var idsvrContext = IdentityServerContextHelper.Create();
+            var options = TestIdentityServerOptions.Create();
+            var context = new MockHttpContextAccessor(options);
             var logger = TestLogger.Create<TokenValidator>();
 
             var validator = new TokenValidator(
                 clients: clients,
-                tokenHandles: tokenStore,
+                grants: grants,
                 customValidator: new DefaultCustomTokenValidator(
                     profile: profile,
                     clients: clients,
                     logger: TestLogger.Create<DefaultCustomTokenValidator>()),
-                    keys: new[] { new InMemoryValidationKeysStore(new[] { TestCert.LoadSigningCredentials().Key }) },
+                    keys: new DefaultKeyMaterialService(new[] { new DefaultValidationKeysStore(new[] { TestCert.LoadSigningCredentials().Key }) }),
                 logger: logger,
-                context: idsvrContext);
+                options: options,
+                context: context);
 
             return validator;
         }
@@ -211,6 +211,13 @@ namespace IdentityServer4.Tests.Validation
             }
 
             return new ClientSecretValidator(clients, parser, validator, new TestEventService(), TestLogger.Create<ClientSecretValidator>());
+        }
+
+        public static IPersistedGrantService CreateGrantService()
+        {
+            return new DefaultPersistedGrantService(new InMemoryPersistedGrantStore(),
+                new PersistentGrantSerializer(),
+                TestLogger.Create<DefaultPersistedGrantService>());
         }
     }
 }

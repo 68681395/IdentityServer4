@@ -1,12 +1,13 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityServer4.Services;
 using System.Threading.Tasks;
-using IdentityServer4.Extensions;
 using IdentityServer4.Events;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http;
+using IdentityServer4.Stores;
 
 namespace IdentityServer4.Validation
 {
@@ -39,14 +40,14 @@ namespace IdentityServer4.Validation
             var parsedSecret = await _parser.ParseAsync(context);
             if (parsedSecret == null)
             {
-                await RaiseFailureEvent("unknown", "No client id or secret found");
+                await RaiseFailureEvent("unknown", "No client id found");
 
-                _logger.LogError("No client secret found");
+                _logger.LogError("No client identifier found");
                 return fail;
             }
 
             // load client
-            var client = await _clients.FindClientByIdAsync(parsedSecret.Id);
+            var client = await _clients.FindEnabledClientByIdAsync(parsedSecret.Id);
             if (client == null)
             {
                 await RaiseFailureEvent(parsedSecret.Id, "Unknown client");
@@ -55,7 +56,7 @@ namespace IdentityServer4.Validation
                 return fail;
             }
 
-            if (client.PublicClient)
+            if (!client.RequireClientSecret)
             {
                 _logger.LogDebug("Public Client - skipping secret validation success");
             }
@@ -65,13 +66,13 @@ namespace IdentityServer4.Validation
                 if (result.Success == false)
                 {
                     await RaiseFailureEvent(client.ClientId, "Invalid client secret");
-                    _logger.LogError("Client validation failed for client: {clientId}.", client.ClientId);
+                    _logger.LogError("Client secret validation failed for client: {clientId}.", client.ClientId);
 
                     return fail;
                 }
             }
 
-            _logger.LogInformation("Client validation success");
+            _logger.LogDebug("Client validation success");
 
             var success = new ClientSecretValidationResult
             {

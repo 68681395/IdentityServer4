@@ -1,7 +1,6 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
-using IdentityModel;
 
 namespace IdentityServer4.Models
 {
@@ -32,15 +31,7 @@ namespace IdentityServer4.Models
         /// <value>
         /// The error code.
         /// </value>
-        public string ErrorCode { get; set; }
-
-        /// <summary>
-        /// Gets or sets the error message.
-        /// </summary>
-        /// <value>
-        /// The error message.
-        /// </value>
-        public string ErrorDescription { get; set; }
+        public string Error { get; set; }
 
         /// <summary>
         /// The per-request identifier. This can be used to display to the end user and can be used in diagnostics.
@@ -49,13 +40,5 @@ namespace IdentityServer4.Models
         /// The request identifier.
         /// </value>
         public string RequestId { get; set; }
-
-        /// <summary>
-        /// Information about the client where a user is allowed to navigate after the error page is displayed.
-        /// </summary>
-        /// <value>
-        /// The return information.
-        /// </value>
-        public ClientReturnInfo ReturnInfo { get; set; }
     }
 }

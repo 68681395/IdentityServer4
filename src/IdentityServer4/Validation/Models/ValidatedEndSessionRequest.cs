@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityServer4.Models;
 
 namespace IdentityServer4.Validation
@@ -10,6 +11,14 @@ namespace IdentityServer4.Validation
     /// </summary>
     public class ValidatedEndSessionRequest : ValidatedRequest
     {
+        /// <summary>
+        /// Gets a value indicating whether this instance is authenticated.
+        /// </summary>
+        /// <value>
+        /// <c>true</c> if this instance is authenticated; otherwise, <c>false</c>.
+        /// </value>
+        public bool IsAuthenticated => Client != null;
+
         /// <summary>
         /// Gets or sets the client.
         /// </summary>

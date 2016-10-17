@@ -1,20 +1,20 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using FluentAssertions;
 using IdentityModel;
 using IdentityServer4.Configuration;
-using IdentityServer4.Extensions;
 using IdentityServer4.Models;
-using IdentityServer4.Services;
-using IdentityServer4.Services.InMemory;
+using IdentityServer4.Stores;
+using IdentityServer4.UnitTests.Common;
 using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace IdentityServer4.Tests.Validation.Tokens
+namespace IdentityServer4.UnitTests.Validation
 {
     public class AccessTokenValidation : IDisposable
     {
@@ -27,29 +27,29 @@ namespace IdentityServer4.Tests.Validation.Tokens
             JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
         }
 
-        DateTimeOffset now;
-        public DateTimeOffset UtcNow
+        DateTime now;
+        public DateTime UtcNow
         {
             get
             {
-                if (now > DateTimeOffset.MinValue) return now;
-                return DateTimeOffset.UtcNow;
+                if (now > DateTime.MinValue) return now;
+                return DateTime.UtcNow;
             }
         }
 
-        Func<DateTimeOffset> originalNowFunc;
+        Func<DateTime> originalNowFunc;
         
         public AccessTokenValidation()
         {
-            originalNowFunc = DateTimeOffsetHelper.UtcNowFunc;
-            DateTimeOffsetHelper.UtcNowFunc = () => UtcNow;
+            originalNowFunc = DateTimeHelper.UtcNowFunc;
+            DateTimeHelper.UtcNowFunc = () => UtcNow;
         }
 
         public void Dispose()
         {
             if (originalNowFunc != null)
             {
-                DateTimeOffsetHelper.UtcNowFunc = originalNowFunc;
+                DateTimeHelper.UtcNowFunc = originalNowFunc;
             }
         }
 
@@ -58,13 +58,13 @@ namespace IdentityServer4.Tests.Validation.Tokens
         [Trait("Category", Category)]
         public async Task Valid_Reference_Token()
         {
-            var store = new InMemoryTokenHandleStore();
-            var validator = Factory.CreateTokenValidator(store);
+            var grants = Factory.CreateGrantService();
+            var validator = Factory.CreateTokenValidator(grants);
 
             var token = TokenFactory.CreateAccessToken(new Client { ClientId = "roclient" }, "valid", 600, "read", "write");
             var handle = "123";
 
-            await store.StoreAsync(handle, token);
+            await grants.StoreReferenceTokenAsync(handle, token);
 
             var result = await validator.ValidateAccessTokenAsync("123");
 
@@ -77,13 +77,13 @@ namespace IdentityServer4.Tests.Validation.Tokens
         [Trait("Category", Category)]
         public async Task Valid_Reference_Token_with_required_Scope()
         {
-            var store = new InMemoryTokenHandleStore();
-            var validator = Factory.CreateTokenValidator(store);
+            var grants = Factory.CreateGrantService();
+            var validator = Factory.CreateTokenValidator(grants);
 
             var token = TokenFactory.CreateAccessToken(new Client { ClientId = "roclient" }, "valid", 600, "read", "write");
             var handle = "123";
 
-            await store.StoreAsync(handle, token);
+            await grants.StoreReferenceTokenAsync(handle, token);
 
             var result = await validator.ValidateAccessTokenAsync("123", "read");
 
@@ -94,13 +94,13 @@ namespace IdentityServer4.Tests.Validation.Tokens
         [Trait("Category", Category)]
         public async Task Valid_Reference_Token_with_missing_Scope()
         {
-            var store = new InMemoryTokenHandleStore();
-            var validator = Factory.CreateTokenValidator(store);
+            var grants = Factory.CreateGrantService();
+            var validator = Factory.CreateTokenValidator(grants);
 
             var token = TokenFactory.CreateAccessToken(new Client { ClientId = "roclient" }, "valid", 600, "read", "write");
             var handle = "123";
 
-            await store.StoreAsync(handle, token);
+            await grants.StoreReferenceTokenAsync(handle, token);
 
             var result = await validator.ValidateAccessTokenAsync("123", "missing");
 
@@ -112,8 +112,7 @@ namespace IdentityServer4.Tests.Validation.Tokens
         [Trait("Category", Category)]
         public async Task Unknown_Reference_Token()
         {
-            var store = new InMemoryTokenHandleStore();
-            var validator = Factory.CreateTokenValidator(store);
+            var validator = Factory.CreateTokenValidator();
 
             var result = await validator.ValidateAccessTokenAsync("unknown");
 
@@ -125,8 +124,7 @@ namespace IdentityServer4.Tests.Validation.Tokens
         [Trait("Category", Category)]
         public async Task Reference_Token_Too_Long()
         {
-            var store = new InMemoryTokenHandleStore();
-            var validator = Factory.CreateTokenValidator(store);
+            var validator = Factory.CreateTokenValidator();
             var options = new IdentityServerOptions();
 
             var longToken = "x".Repeat(options.InputLengthRestrictions.TokenHandle + 1);
@@ -140,15 +138,15 @@ namespace IdentityServer4.Tests.Validation.Tokens
         [Trait("Category", Category)]
         public async Task Expired_Reference_Token()
         {
-            now = DateTimeOffset.UtcNow;
+            now = DateTime.UtcNow;
 
-            var store = new InMemoryTokenHandleStore();
-            var validator = Factory.CreateTokenValidator(store);
+            var grants = Factory.CreateGrantService();
+            var validator = Factory.CreateTokenValidator(grants);
 
             var token = TokenFactory.CreateAccessToken(new Client { ClientId = "roclient" }, "valid", 2, "read", "write");
             var handle = "123";
 
-            await store.StoreAsync(handle, token);
+            await grants.StoreReferenceTokenAsync(handle, token);
             
             now = now.AddMilliseconds(2000);
 
@@ -162,8 +160,7 @@ namespace IdentityServer4.Tests.Validation.Tokens
         [Trait("Category", Category)]
         public async Task Malformed_JWT_Token()
         {
-            var store = new InMemoryTokenHandleStore();
-            var validator = Factory.CreateTokenValidator(store);
+            var validator = Factory.CreateTokenValidator();
 
             var result = await validator.ValidateAccessTokenAsync("unk.nown");
 
@@ -234,13 +231,13 @@ namespace IdentityServer4.Tests.Validation.Tokens
         [Trait("Category", Category)]
         public async Task Valid_AccessToken_but_Client_not_active()
         {
-            var store = new InMemoryTokenHandleStore();
-            var validator = Factory.CreateTokenValidator(store);
+            var grants = Factory.CreateGrantService();
+            var validator = Factory.CreateTokenValidator(grants);
 
             var token = TokenFactory.CreateAccessToken(new Client { ClientId = "unknown" }, "valid", 600, "read", "write");
             var handle = "123";
 
-            await store.StoreAsync(handle, token);
+            await grants.StoreReferenceTokenAsync(handle, token);
 
             var result = await validator.ValidateAccessTokenAsync("123");
 

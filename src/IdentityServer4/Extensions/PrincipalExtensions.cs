@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityModel;
 using System;
 using System.Collections.Generic;
@@ -21,9 +22,9 @@ namespace IdentityServer4.Extensions
         /// <param name="principal">The principal.</param>
         /// <returns></returns>
         [DebuggerStepThrough]
-        public static DateTimeOffset GetAuthenticationTime(this IPrincipal principal)
+        public static DateTime GetAuthenticationTime(this IPrincipal principal)
         {
-            return principal.GetAuthenticationTimeEpoch().ToDateTimeOffsetFromEpoch();
+            return principal.GetAuthenticationTimeEpoch().ToDateTimeFromEpoch();
         }
 
         /// <summary>

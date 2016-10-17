@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
+
 using IdentityServer4.Extensions;
 using IdentityServer4.Models;
 using System;
@@ -17,33 +18,38 @@ namespace IdentityServer4.Services.Default
     public class DefaultConsentService : IConsentService
     {
         /// <summary>
-        /// The consent store
+        /// The grants
         /// </summary>
-        protected readonly IConsentStore _store;
+        protected readonly IPersistedGrantService _grants;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="DefaultConsentService"/> class.
+        /// Initializes a new instance of the <see cref="DefaultConsentService" /> class.
         /// </summary>
-        /// <param name="store">The consent store.</param>
+        /// <param name="grants">The grants.</param>
         /// <exception cref="System.ArgumentNullException">store</exception>
-        public DefaultConsentService(IConsentStore store)
+        public DefaultConsentService(IPersistedGrantService grants)
         {
-            if (store == null) throw new ArgumentNullException("store");
-
-            this._store = store;
+            _grants = grants;
         }
 
         /// <summary>
         /// Checks if consent is required.
         /// </summary>
-        /// <param name="client">The client.</param>
         /// <param name="subject">The user.</param>
+        /// <param name="client">The client.</param>
         /// <param name="scopes">The scopes.</param>
-        /// <returns>Boolean if consent is required.</returns>
-        public virtual async Task<bool> RequiresConsentAsync(Client client, ClaimsPrincipal subject, IEnumerable<string> scopes)
+        /// <returns>
+        /// Boolean if consent is required.
+        /// </returns>
+        /// <exception cref="System.ArgumentNullException">
+        /// client
+        /// or
+        /// subject
+        /// </exception>
+        public virtual async Task<bool> RequiresConsentAsync(ClaimsPrincipal subject, Client client, IEnumerable<string> scopes)
         {
-            if (client == null) throw new ArgumentNullException("client");
-            if (subject == null) throw new ArgumentNullException("subject");
+            if (client == null) throw new ArgumentNullException(nameof(client));
+            if (subject == null) throw new ArgumentNullException(nameof(subject));
 
             if (!client.RequireConsent)
             {
@@ -68,7 +74,7 @@ namespace IdentityServer4.Services.Default
                 return true;
             }
             
-            var consent = await _store.LoadAsync(subject.GetSubjectId(), client.ClientId);
+            var consent = await _grants.GetUserConsentAsync(subject.GetSubjectId(), client.ClientId);
             if (consent != null && consent.Scopes != null)
             {
                 var intersect = scopes.Intersect(consent.Scopes);
@@ -79,16 +85,21 @@ namespace IdentityServer4.Services.Default
         }
 
         /// <summary>
-        /// Updates the consent.
+        /// Updates the consent asynchronous.
         /// </summary>
         /// <param name="client">The client.</param>
         /// <param name="subject">The subject.</param>
         /// <param name="scopes">The scopes.</param>
         /// <returns></returns>
-        public virtual async Task UpdateConsentAsync(Client client, ClaimsPrincipal subject, IEnumerable<string> scopes)
+        /// <exception cref="System.ArgumentNullException">
+        /// client
+        /// or
+        /// subject
+        /// </exception>
+        public virtual async Task UpdateConsentAsync(ClaimsPrincipal subject, Client client, IEnumerable<string> scopes)
         {
-            if (client == null) throw new ArgumentNullException("client");
-            if (subject == null) throw new ArgumentNullException("subject");
+            if (client == null) throw new ArgumentNullException(nameof(client));
+            if (subject == null) throw new ArgumentNullException(nameof(subject));
 
             if (client.AllowRememberConsent)
             {
@@ -99,15 +110,15 @@ namespace IdentityServer4.Services.Default
                 {
                     var consent = new Consent
                     {
-                        Subject = subjectId,
+                        SubjectId = subjectId,
                         ClientId = clientId,
                         Scopes = scopes
                     };
-                    await _store.UpdateAsync(consent);
+                    await _grants.StoreUserConsentAsync(consent);
                 }
                 else
                 {
-                    await _store.RevokeAsync(subjectId, clientId);
+                    await _grants.RemoveUserConsentAsync(subjectId, clientId);
                 }
             }
         }

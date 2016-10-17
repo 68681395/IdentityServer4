@@ -1,10 +1,8 @@
 ﻿// Copyright (c) Brock Allen & Dominick Baier. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
-using IdentityServer4.Extensions;
-using System;
+
 using System.Collections.Generic;
-using System.Collections.Specialized;
 using System.Linq;
 
 namespace IdentityServer4.Models
@@ -22,13 +20,7 @@ namespace IdentityServer4.Models
         /// <value>
         ///   <c>true</c> if consent was granted; otherwise, <c>false</c>.
         /// </value>
-        public bool Granted
-        {
-            get
-            {
-                return ScopesConsented != null && ScopesConsented.Any();
-            }
-        }
+        public bool Granted => ScopesConsented != null && ScopesConsented.Any();
 
         /// <summary>
         /// Gets or sets the scopes consented to.
